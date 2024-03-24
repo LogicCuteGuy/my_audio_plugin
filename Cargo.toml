@@ -2,10 +2,13 @@
 resolver = "2"
 members = [
     "examples/demo",
+    "plugins/copiremap",
     "nih_plug_slint",
     "plugin-canvas",
     "plugin-canvas-slint",
     "xtask",
+    "lib/pitch_shift",
+    "lib/iir_filters"
 ]
 
 [workspace.dependencies]
@@ -16,6 +19,12 @@ plugin-canvas = { path = "plugin-canvas" }
 plugin-canvas-slint = { path = "plugin-canvas-slint" }
 raw-window-handle = "0.5"
 slint = { version = "1.5.1", default-features = false, features = ["accessibility", "compat-1-2", "std"] }
+pitch_shift = { path = "lib/pitch_shift" }
+iir_filters = { path = "lib/iir_filters" }
+realfft = "3.3.0"
+num-complex = "0.4.5"
+num-traits = "0.2.18"
+thiserror = "1.0.58"
 
 # Internal slint crate versions need to be pinned
 # since they don't maintain semver compatibility
