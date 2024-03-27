@@ -1,3 +1,6 @@
+mod macros;
+mod hzcal;
+
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
 
@@ -10,6 +13,7 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
+use crate::macros::MacroParams;
 
 const DB_MIN: f32 = -80.0;
 const DB_MAX: f32 = 20.0;
@@ -18,8 +22,58 @@ slint::include_modules!();
 
 #[derive(Params)]
 pub struct PluginParams {
-    #[id = "gain"]
-    pub gain: FloatParam,
+
+    #[nested(group = "macros")]
+    pub macros: Arc<MacroParams>,
+
+    #[nested(group = "global")]
+    pub global: Arc<GlobalParams>,
+
+}
+
+#[derive(Params)]
+pub struct GlobalParams {
+    #[id = "input_gain"]
+    pub input_gain: FloatParam,
+
+    #[id = "dry_gain"]
+    pub dry_gain: FloatParam,
+
+    #[id = "wet_gain"]
+    pub wet_gain: FloatParam,
+
+    #[id = "output_gain"]
+    pub output_gain: FloatParam,
+
+    #[id = "link_bandwidth"]
+    pub link_bandwidth: BoolParam,
+
+    #[id = "low_bandwidth"]
+    pub low_bandwidth: FloatParam,
+
+    #[id = "high_bandwidth"]
+    pub high_bandwidth: FloatParam,
+
+    #[id = "low_order"]
+    pub low_order: IntParam,
+
+    #[id = "high_order"]
+    pub high_order: IntParam,
+
+    #[id = "low_note_off"]
+    pub low_note_off: IntParam,
+
+    #[id = "high_note_off"]
+    pub high_note_off: IntParam,
+
+    #[id = "pitch_shift"]
+    pub pitch_shift: BoolParam,
+
+    #[id = "in_key_gain"]
+    pub in_key_gain: FloatParam,
+
+    #[id = "off_key_gain"]
+    pub off_key_gain: FloatParam,
 }
 
 pub struct PluginComponent {
@@ -45,7 +99,7 @@ impl PluginComponent {
     fn drag_event_response(&self, position: &LogicalPosition) -> EventResponse {
         self.component.set_drag_x(position.x as f32);
         self.component.set_drag_y(position.y as f32);
-    
+
         let drop_area_x = self.component.get_drop_area_x() as f64;
         let drop_area_y = self.component.get_drop_area_y() as f64;
         let drop_area_width = self.component.get_drop_area_width() as f64;
@@ -170,9 +224,9 @@ impl Default for CoPiReMapPlugin {
                     max: db_to_gain(DB_MAX),
                     factor: FloatRange::gain_skew_factor(DB_MIN, DB_MAX),
                 })
-            .with_unit("dB")
-            .with_value_to_string(nih_plug::formatters::v2s_f32_gain_to_db(1))
-            .with_string_to_value(nih_plug::formatters::s2v_f32_gain_to_db()),
+                .with_unit("dB")
+                .with_value_to_string(nih_plug::formatters::v2s_f32_gain_to_db(1))
+                .with_string_to_value(nih_plug::formatters::s2v_f32_gain_to_db()),
         });
 
         Self {

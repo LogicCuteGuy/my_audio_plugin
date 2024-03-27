@@ -66,7 +66,6 @@ impl PitchShifter {
         let fs_real = frame_size as SampleReal;
 
         let double_frame_size = frame_size * 2;
-        let half_frame_size = (frame_size / 2) + 1;
 
         let mut planner = RealFftPlanner::<f32>::new();
         let forward_fft = planner.plan_fft_forward(frame_size);
@@ -89,6 +88,7 @@ impl PitchShifter {
         let bin_frequencies = sample_rate as SampleReal / fs_real;
         let expected = TAU / (over_sampling as SampleReal);
         let fifo_latency = frame_size - step;
+        println!("{}", fifo_latency);
         let mut overlap= 0;
         overlap = fifo_latency;
 
