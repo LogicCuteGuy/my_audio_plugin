@@ -1,5 +1,9 @@
-mod macros;
-mod hzcal;
+mod hertz_calculator;
+mod key_note_midi;
+mod eq_mode;
+mod audio_process;
+mod key_note_gen;
+mod note_table;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
@@ -13,7 +17,9 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
-use crate::macros::MacroParams;
+use crate::hertz_calculator::HZCalculatorParams;
+use crate::key_note_midi::KeyNoteParams;
+use crate::note_table::NoteTable;
 
 const DB_MIN: f32 = -80.0;
 const DB_MAX: f32 = 20.0;
@@ -23,42 +29,33 @@ slint::include_modules!();
 #[derive(Params)]
 pub struct PluginParams {
 
-    #[nested(group = "macros")]
-    pub macros: Arc<MacroParams>,
+    #[persist = "note_table"]
+    pub note_table: Arc<NoteTable>,
 
     #[nested(group = "global")]
     pub global: Arc<GlobalParams>,
+
+    #[nested(group = "hz_calculator")]
+    pub hz_calculator: Arc<HZCalculatorParams>,
+
+    #[nested(group = "key_note")]
+    pub key_note: Arc<KeyNoteParams>,
 
 }
 
 #[derive(Params)]
 pub struct GlobalParams {
-    #[id = "input_gain"]
-    pub input_gain: FloatParam,
-
-    #[id = "dry_gain"]
-    pub dry_gain: FloatParam,
-
     #[id = "wet_gain"]
     pub wet_gain: FloatParam,
 
-    #[id = "output_gain"]
-    pub output_gain: FloatParam,
+    #[id = "threshold"]
+    pub threshold: FloatParam,
 
-    #[id = "link_bandwidth"]
-    pub link_bandwidth: BoolParam,
+    #[id = "attack"]
+    pub attack: FloatParam,
 
-    #[id = "low_bandwidth"]
-    pub low_bandwidth: FloatParam,
-
-    #[id = "high_bandwidth"]
-    pub high_bandwidth: FloatParam,
-
-    #[id = "low_order"]
-    pub low_order: IntParam,
-
-    #[id = "high_order"]
-    pub high_order: IntParam,
+    #[id = "release"]
+    pub release: FloatParam,
 
     #[id = "low_note_off"]
     pub low_note_off: IntParam,
@@ -68,6 +65,9 @@ pub struct GlobalParams {
 
     #[id = "pitch_shift"]
     pub pitch_shift: BoolParam,
+
+    #[id = "a_p_s_bp"]
+    pub a_p_s_bp: BoolParam,
 
     #[id = "in_key_gain"]
     pub in_key_gain: FloatParam,
