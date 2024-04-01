@@ -5,6 +5,9 @@ pub struct KeyNoteParams {
     #[id = "midi"]
     pub midi: BoolParam,
 
+    #[id = "repeat"]
+    pub repeat: BoolParam,
+
     #[id = "c"]
     pub c: BoolParam,
 
@@ -46,6 +49,7 @@ impl Default for KeyNoteParams {
     fn default() -> Self {
         Self {
             midi: BoolParam::new("Midi", false),
+            repeat: BoolParam::new("Repeat", false),
             c: BoolParam::new("C", false),
             c_sharp: BoolParam::new("C#", false),
             d: BoolParam::new("D", false),

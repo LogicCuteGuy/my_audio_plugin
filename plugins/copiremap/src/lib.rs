@@ -1,9 +1,8 @@
 mod hertz_calculator;
-mod key_note_midi;
-mod eq_mode;
+mod key_note_midi_gen;
 mod audio_process;
-mod key_note_gen;
 mod note_table;
+mod delay;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
@@ -17,8 +16,9 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
+use crate::audio_process::AudioProcessParams;
 use crate::hertz_calculator::HZCalculatorParams;
-use crate::key_note_midi::KeyNoteParams;
+use crate::key_note_midi_gen::KeyNoteParams;
 use crate::note_table::NoteTable;
 
 const DB_MIN: f32 = -80.0;
@@ -35,6 +35,9 @@ pub struct PluginParams {
     #[nested(group = "global")]
     pub global: Arc<GlobalParams>,
 
+    #[nested(group = "audio_process")]
+    pub audio_process: Arc<AudioProcessParams>,
+
     #[nested(group = "hz_calculator")]
     pub hz_calculator: Arc<HZCalculatorParams>,
 
@@ -45,35 +48,15 @@ pub struct PluginParams {
 
 #[derive(Params)]
 pub struct GlobalParams {
+
+    #[id = "bypass"]
+    pub bypass: FloatParam,
+
     #[id = "wet_gain"]
     pub wet_gain: FloatParam,
 
-    #[id = "threshold"]
-    pub threshold: FloatParam,
-
-    #[id = "attack"]
-    pub attack: FloatParam,
-
-    #[id = "release"]
-    pub release: FloatParam,
-
-    #[id = "low_note_off"]
-    pub low_note_off: IntParam,
-
-    #[id = "high_note_off"]
-    pub high_note_off: IntParam,
-
-    #[id = "pitch_shift"]
-    pub pitch_shift: BoolParam,
-
-    #[id = "a_p_s_bp"]
-    pub a_p_s_bp: BoolParam,
-
-    #[id = "in_key_gain"]
-    pub in_key_gain: FloatParam,
-
-    #[id = "off_key_gain"]
-    pub off_key_gain: FloatParam,
+    #[id = "global_threshold"]
+    pub global_threshold: FloatParam,
 }
 
 pub struct PluginComponent {
@@ -244,6 +227,9 @@ impl Plugin for CoPiReMapPlugin {
     const URL: &'static str = "copiremap.logiccuteguy.com";
     const EMAIL: &'static str = "contact@logiccuteguy.com";
     const VERSION: &'static str = "0.0";
+
+    const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
+    const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
 
     const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
         AudioIOLayout {
