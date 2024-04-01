@@ -1,8 +1,8 @@
 import { VerticalBox } from "std-widgets.slint";
-import { PluginFloatParameter } from "parameter.slint";
+import { PluginParameter } from "parameter.slint";
 
 export component ParameterKnob inherits Rectangle {
-    in-out property <PluginFloatParameter> parameter;
+    in-out property <PluginParameter> parameter;
     in-out property <angle> min-angle: -250deg;
     in-out property <angle> max-angle:   70deg;
     in-out property <float> sensitivity: 0.25;

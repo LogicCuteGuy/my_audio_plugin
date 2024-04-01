@@ -18,7 +18,7 @@ use plugin_canvas::event::EventResponse;
 use slint::SharedString;
 use crate::audio_process::AudioProcessParams;
 use crate::hertz_calculator::HZCalculatorParams;
-use crate::key_note_midi_gen::KeyNoteParams;
+use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
 use crate::note_table::NoteTable;
 
 const DB_MIN: f32 = -80.0;
@@ -99,7 +99,7 @@ impl PluginComponent {
         }
     }
 
-    fn convert_parameter(&self, id: &str) -> PluginFloatParameter {
+    fn convert_parameter(&self, id: &str) -> PluginParameter {
         let param_ptr = self.param_map.get(id.into()).unwrap();
 
         let value = unsafe { param_ptr.unmodulated_normalized_value() };
@@ -107,7 +107,7 @@ impl PluginComponent {
         let display_value = unsafe { param_ptr.normalized_value_to_string(value, true) };
         let modulated_value = unsafe { param_ptr.modulated_normalized_value() };
 
-        PluginFloatParameter {
+        PluginParameter {
             id: id.into(),
             default_value,
             display_value: display_value.into(),
@@ -116,7 +116,7 @@ impl PluginComponent {
         }
     }
 
-    fn set_parameter(&self, id: &str, parameter: PluginFloatParameter) {
+    fn set_parameter(&self, id: &str, parameter: PluginParameter) {
         match id {
             "gain" => self.component.set_gain(parameter),
             _ => unimplemented!(),
@@ -129,7 +129,7 @@ impl PluginComponentHandle for PluginComponent {
         self.component.window()
     }
 
-    fn param_map(&self) -> &HashMap<slint::SharedString, ParamPtr> {
+    fn param_map(&self) -> &HashMap<SharedString, ParamPtr> {
         &self.param_map
     }
 
@@ -175,25 +175,27 @@ impl PluginComponentHandle for PluginComponent {
 }
 
 impl PluginComponentHandleParameterEvents for PluginComponent {
-    fn on_start_parameter_change(&self, mut f: impl FnMut(slint::SharedString) + 'static) {
+    fn on_start_parameter_change(&self, mut f: impl FnMut(SharedString) + 'static) {
         self.component.on_start_change(move |parameter| f(parameter.id.into()));
     }
 
-    fn on_parameter_changed(&self, mut f: impl FnMut(slint::SharedString, f32) + 'static) {
+    fn on_parameter_changed(&self, mut f: impl FnMut(SharedString, f32) + 'static) {
         self.component.on_changed(move |parameter, value| f(parameter.id.into(), value));
     }
 
-    fn on_end_parameter_change(&self, mut f: impl FnMut(slint::SharedString) + 'static) {
+    fn on_end_parameter_change(&self, mut f: impl FnMut(SharedString) + 'static) {
         self.component.on_end_change(move |parameter| f(parameter.id.into()));
     }
 
-    fn on_set_parameter_string(&self, mut f: impl FnMut(slint::SharedString, slint::SharedString) + 'static) {
+    fn on_set_parameter_string(&self, mut f: impl FnMut(SharedString, SharedString) + 'static) {
         self.component.on_set_string(move |parameter, string| f(parameter.id.into(), string));
     }
 }
 
 pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
+
+    midi_note: MidiNote,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -278,15 +280,34 @@ impl Plugin for CoPiReMapPlugin {
         &mut self,
         buffer: &mut Buffer<'_>,
         _aux: &mut AuxiliaryBuffers<'_>,
-        _context: &mut impl ProcessContext<Self>
+        context: &mut impl ProcessContext<Self>
     ) -> ProcessStatus
     {
-        for channel in buffer.as_slice() {
-            for sample in channel.iter_mut() {
-                *sample *= self.params.gain.value();
+        while let Some(event) = context.next_event() {
+            match event {
+                NoteEvent::NoteOn {
+                    timing,
+                    voice_id,
+                    channel,
+                    note,
+                    velocity,
+                } => self.midi_note.note[note] = true,
+                NoteEvent::NoteOff {
+                    timing,
+                    voice_id,
+                    channel,
+                    note,
+                    velocity,
+                } => self.midi_note.note[note] = false,
+                _ => (),
             }
         }
 
+        for channel in buffer.as_slice() {
+            for sample in channel.iter_mut() {
+
+            }
+        }
         ProcessStatus::Normal
     }
 }
@@ -296,16 +317,17 @@ impl ClapPlugin for CoPiReMapPlugin {
     const CLAP_DESCRIPTION: Option<&'static str> = None;
     const CLAP_MANUAL_URL: Option<&'static str> = None;
     const CLAP_SUPPORT_URL: Option<&'static str> = None;
-    const CLAP_FEATURES: &'static [nih_plug::prelude::ClapFeature] = &[
+    const CLAP_FEATURES: &'static [ClapFeature] = &[
         ClapFeature::AudioEffect,
         ClapFeature::Stereo,
-        ClapFeature::Utility,
+        ClapFeature::Filter,
+        ClapFeature::Equalizer,
     ];
 }
 
 impl Vst3Plugin for CoPiReMapPlugin {
     const VST3_CLASS_ID: [u8; 16] = *b"CoPiReMapPlugins";
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx, Vst3SubCategory::Tools];
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx, Vst3SubCategory::Filter, Vst3SubCategory::Spatial];
 }
 
 nih_export_clap!(CoPiReMapPlugin);

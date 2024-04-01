@@ -1,8 +1,8 @@
 import { VerticalBox } from "std-widgets.slint";
-import { PluginFloatParameter } from "parameter.slint";
+import { PluginParameter } from "parameter.slint";
 
 export component ParameterSlider inherits Rectangle {
-    in-out property<PluginFloatParameter> parameter;
+    in-out property<PluginParameter> parameter;
 
     property <bool> changing;
 

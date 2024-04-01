@@ -1,4 +1,6 @@
 use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
+use nih_plug::prelude::{IntRange};
+use crate::PluginParams;
 
 #[derive(Params)]
 pub struct KeyNoteParams {
@@ -7,6 +9,12 @@ pub struct KeyNoteParams {
 
     #[id = "repeat"]
     pub repeat: BoolParam,
+
+    #[id = "find_true_key"]
+    pub find_true_key: IntParam,
+
+    #[id = "round_up"]
+    pub round_up: BoolParam,
 
     #[id = "c"]
     pub c: BoolParam,
@@ -50,6 +58,8 @@ impl Default for KeyNoteParams {
         Self {
             midi: BoolParam::new("Midi", false),
             repeat: BoolParam::new("Repeat", false),
+            find_true_key: IntParam::new("Find True Key", 1, IntRange::Linear{ min: 0, max: 127 }),
+            round_up: BoolParam::new("Round Up", false),
             c: BoolParam::new("C", false),
             c_sharp: BoolParam::new("C#", false),
             d: BoolParam::new("D", false),
@@ -63,5 +73,30 @@ impl Default for KeyNoteParams {
             a_sharp: BoolParam::new("A#", false),
             b: BoolParam::new("B", false),
         }
+    }
+}
+
+pub struct MidiNote {
+    pub note: [bool; 128]
+}
+
+impl Default for MidiNote {
+    fn default() -> Self {
+        let mut note = [false; 128];
+        for i in 0..128 {
+            note[i] = false;
+        }
+        Self {
+            note
+        }
+    }
+}
+
+impl MidiNote {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn update(&mut self, params: &mut PluginParams) {
     }
 }

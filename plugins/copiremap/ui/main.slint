@@ -1,9 +1,9 @@
-import { PluginFloatParameter } from "parameter.slint";
+import { PluginParameter } from "parameter.slint";
 import { ParameterKnob } from "knob.slint";
 import { ParameterSlider } from "slider.slint";
 
 export component PluginWindow {
-    in-out property<PluginFloatParameter> gain;
+    in-out property<PluginParameter> gain;
 
     in-out property <bool> dragging;
     in-out property <length> drag-x;
@@ -14,10 +14,10 @@ export component PluginWindow {
     out property <length> drop-area-width: drop-area.width;
     out property <length> drop-area-height: drop-area.height;
 
-    callback start-change(PluginFloatParameter);
-    callback changed(PluginFloatParameter, float);
-    callback end-change(PluginFloatParameter);
-    callback set-string(PluginFloatParameter, string);
+    callback start-change(PluginParameter);
+    callback changed(PluginParameter, float);
+    callback end-change(PluginParameter);
+    callback set-string(PluginParameter, string);
 
     Rectangle {
         background: gold;

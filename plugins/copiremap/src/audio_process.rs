@@ -47,7 +47,4 @@ pub struct AudioProcessParams {
 
     #[id = "off_key_gain"]
     pub off_key_gain: FloatParam,
-
-    #[id = "off_key"]
-    pub off_key: BoolParam,
 }
