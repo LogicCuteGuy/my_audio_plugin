@@ -16,7 +16,7 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
-use crate::audio_process::AudioProcessParams;
+use crate::audio_process::{AudioProcessNot, AudioProcessParams};
 use crate::hertz_calculator::HZCalculatorParams;
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
 use crate::note_table::NoteTable;
@@ -31,6 +31,9 @@ pub struct PluginParams {
 
     #[persist = "note_table"]
     pub note_table: Arc<NoteTable>,
+
+    #[persist = "audio_process_not"]
+    pub audio_process_not: Arc<AudioProcessNot>,
 
     #[nested(group = "global")]
     pub global: Arc<GlobalParams>,
@@ -50,13 +53,37 @@ pub struct PluginParams {
 pub struct GlobalParams {
 
     #[id = "bypass"]
-    pub bypass: FloatParam,
+    pub bypass: BoolParam,
 
     #[id = "wet_gain"]
     pub wet_gain: FloatParam,
 
     #[id = "global_threshold"]
     pub global_threshold: FloatParam,
+
+}
+
+impl Default for GlobalParams {
+    fn default() -> Self {
+        Self {
+            bypass: BoolParam::new("Bypass", false)
+                .with_value_to_string(formatters::v2s_bool_bypass())
+                .with_string_to_value(formatters::s2v_bool_bypass()),
+            wet_gain: FloatParam::new("Wet Gain", db_to_gain(0.0), FloatRange::Skewed {
+                min: db_to_gain(-30.0),
+                max: db_to_gain(20.0),
+                factor: FloatRange::gain_skew_factor(-30.0, 20.0),
+            }).with_unit(" dB")
+                .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
+                .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            global_threshold: FloatParam::new("Global Threshold", db_to_gain(0.0), FloatRange::Linear {
+                min: db_to_gain(-60.0),
+                max: db_to_gain(0.0),
+            }).with_unit(" dB")
+                .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
+                .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+        }
+    }
 }
 
 pub struct PluginComponent {
@@ -201,21 +228,17 @@ pub struct CoPiReMapPlugin {
 impl Default for CoPiReMapPlugin {
     fn default() -> Self {
         let params = Arc::new(PluginParams {
-            gain: FloatParam::new(
-                "Gain",
-                db_to_gain(0.0),
-                FloatRange::Skewed {
-                    min: db_to_gain(DB_MIN),
-                    max: db_to_gain(DB_MAX),
-                    factor: FloatRange::gain_skew_factor(DB_MIN, DB_MAX),
-                })
-                .with_unit("dB")
-                .with_value_to_string(nih_plug::formatters::v2s_f32_gain_to_db(1))
-                .with_string_to_value(nih_plug::formatters::s2v_f32_gain_to_db()),
+            note_table: Arc::new(NoteTable::default()),
+            audio_process_not: Arc::new(AudioProcessNot { pitch_shift_window_duration_ms: 2 }),
+            global: Arc::new(GlobalParams::default()),
+            audio_process: Arc::new(AudioProcessParams::default()),
+            hz_calculator: Arc::new(Default::default()),
+            key_note: Arc::new(Default::default()),
         });
 
         Self {
             params,
+            midi_note: Default::default(),
         }
     }
 }
