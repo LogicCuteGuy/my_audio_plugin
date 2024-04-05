@@ -142,6 +142,14 @@ impl PitchShifter {
         self.mean_expected = self.expected / self.bin_frequencies;
     }
 
+    pub fn get_latency(&self) -> u32 {
+        self.fifo_latency
+    }
+
+    pub fn reset(&mut self) {
+        self.out_fifo.fill(0.0);
+        self.overlap = self.fifo_latency;
+    }
     /// This is where the magic happens.
     ///
     /// The bigger `over_sampling`, the longer it will take to

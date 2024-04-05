@@ -2,6 +2,8 @@ use nih_plug::formatters;
 use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
 use nih_plug::prelude::{FloatRange, IntRange, SmoothingStyle};
 use nih_plug::util::db_to_gain;
+use crate::filter::MyFilter;
+use crate::pitch::MyPitch;
 
 pub struct AudioProcessNot {
     pub pitch_shift_window_duration_ms: u8,
@@ -14,18 +16,6 @@ pub struct AudioProcessParams {
 
     #[id = "order"]
     pub order: IntParam,
-
-    #[id = "low_note_off"]
-    pub low_note_off: IntParam,
-
-    #[id = "high_note_off"]
-    pub high_note_off: IntParam,
-
-    #[id = "low_note_off_mute"]
-    pub low_note_off_mute: BoolParam,
-
-    #[id = "high_note_off_mute"]
-    pub high_note_off_mute: BoolParam,
 
     #[id = "pitch_shift"]
     pub pitch_shift: BoolParam,
@@ -69,32 +59,6 @@ impl Default for AudioProcessParams {
                     min: 0,
                     max: 15,
                 },
-            ),
-            low_note_off: IntParam::new(
-                "Low Note Off",
-                0,
-                IntRange::Linear {
-                    min: 0,
-                    max: 127,
-                },
-            ).with_value_to_string(formatters::v2s_i32_note_formatter())
-                .with_string_to_value(formatters::s2v_i32_note_formatter()),
-            high_note_off: IntParam::new(
-                "High Note Off",
-                127,
-                IntRange::Linear {
-                    min: 0,
-                    max: 127,
-                }
-            ).with_value_to_string(formatters::v2s_i32_note_formatter())
-                .with_string_to_value(formatters::s2v_i32_note_formatter()),
-            low_note_off_mute: BoolParam::new(
-                "Low Note Off Mute",
-                false,
-            ),
-            high_note_off_mute: BoolParam::new(
-                "High Note Off Mute",
-                false,
             ),
             pitch_shift: BoolParam::new(
                 "Pitch Shift",
@@ -153,6 +117,26 @@ impl Default for AudioProcessParams {
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+        }
+    }
+}
+
+pub struct AudioProcess {
+    bpf: MyFilter,
+    tune: MyPitch,
+    after_tune_bpf: MyFilter,
+}
+
+impl AudioProcess {
+
+}
+
+impl Default for AudioProcess {
+    fn default() -> Self {
+        Self {
+            bpf: MyFilter::default(),
+            tune: MyPitch::default(),
+            after_tune_bpf: MyFilter::default(),
         }
     }
 }

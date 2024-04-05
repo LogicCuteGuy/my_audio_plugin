@@ -24,20 +24,8 @@ impl Default for HZCalculatorParams {
     }
 }
 
-impl HZCalculatorParams {
-
-    pub fn hz_center(&self, note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32) {
-        self.hz_cal(note, center_hz, low_pass, high_pass, self.hz_center.value())
-    }
-
-    pub fn hz_tuning(&self, note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32) {
-        self.hz_cal(note, center_hz, low_pass, high_pass, self.hz_tuning.value())
-    }
-
-    fn hz_cal(&self, note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32, hz_cal: f32) {
-        *center_hz = hz_cal * 2.0_f32.powf((note as f32 - 45.0) / 12.0);
-        *low_pass = ((hz_cal * 2.0_f32.powf((note as f32 - 44.0) / 12.0)) + *center_hz) / 2.0;
-        *high_pass = ((hz_cal * 2.0_f32.powf((note as f32 - 46.0) / 12.0))+ *center_hz) / 2.0;
-    }
-
+pub fn hz_cal(note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32, hz_cal: f32) {
+    *center_hz = hz_cal * 2.0_f32.powf((note as f32 - 45.0) / 12.0);
+    *low_pass = ((hz_cal * 2.0_f32.powf((note as f32 - 44.0) / 12.0)) + *center_hz) / 2.0;
+    *high_pass = ((hz_cal * 2.0_f32.powf((note as f32 - 46.0) / 12.0))+ *center_hz) / 2.0;
 }

@@ -3,6 +3,8 @@ mod key_note_midi_gen;
 mod audio_process;
 mod note_table;
 mod delay;
+mod filter;
+mod pitch;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
@@ -16,7 +18,8 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
-use crate::audio_process::{AudioProcessNot, AudioProcessParams};
+use crate::audio_process::{AudioProcess, AudioProcessNot, AudioProcessParams};
+use crate::filter::MyFilter;
 use crate::hertz_calculator::HZCalculatorParams;
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
 use crate::note_table::NoteTables;
@@ -61,6 +64,18 @@ pub struct GlobalParams {
     #[id = "global_threshold"]
     pub global_threshold: FloatParam,
 
+    #[id = "low_note_off"]
+    pub low_note_off: IntParam,
+
+    #[id = "high_note_off"]
+    pub high_note_off: IntParam,
+
+    #[id = "low_note_off_mute"]
+    pub low_note_off_mute: BoolParam,
+
+    #[id = "high_note_off_mute"]
+    pub high_note_off_mute: BoolParam,
+
 }
 
 impl Default for GlobalParams {
@@ -82,6 +97,32 @@ impl Default for GlobalParams {
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            low_note_off: IntParam::new(
+                "Low Note Off",
+                0,
+                IntRange::Linear {
+                    min: 0,
+                    max: 127,
+                },
+            ).with_value_to_string(formatters::v2s_i32_note_formatter())
+                .with_string_to_value(formatters::s2v_i32_note_formatter()),
+            high_note_off: IntParam::new(
+                "High Note Off",
+                127,
+                IntRange::Linear {
+                    min: 0,
+                    max: 127,
+                }
+            ).with_value_to_string(formatters::v2s_i32_note_formatter())
+                .with_string_to_value(formatters::s2v_i32_note_formatter()),
+            low_note_off_mute: BoolParam::new(
+                "Low Note Off Mute",
+                false,
+            ),
+            high_note_off_mute: BoolParam::new(
+                "High Note Off Mute",
+                false,
+            ),
         }
     }
 }
@@ -223,6 +264,9 @@ pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
     buffer_config: BufferConfig,
     midi_note: MidiNote,
+    audio_process: [AudioProcess; 128],
+    lpf: MyFilter,
+    hpf: MyFilter
 }
 
 impl Default for CoPiReMapPlugin {
@@ -244,7 +288,10 @@ impl Default for CoPiReMapPlugin {
                 max_buffer_size: 0,
                 process_mode: ProcessMode::Realtime,
             },
-            midi_note: Default::default(),
+            midi_note: MidiNote::default(),
+            audio_process: [AudioProcess::default(); 128],
+            lpf: MyFilter::default(),
+            hpf: MyFilter::default(),
         }
     }
 }
@@ -361,7 +408,7 @@ impl ClapPlugin for CoPiReMapPlugin {
 
 impl Vst3Plugin for CoPiReMapPlugin {
     const VST3_CLASS_ID: [u8; 16] = *b"CoPiReMapPlugins";
-    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx, Vst3SubCategory::Filter, Vst3SubCategory::Spatial];
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx, Vst3SubCategory::Filter, Vst3SubCategory::Eq];
 }
 
 nih_export_clap!(CoPiReMapPlugin);
