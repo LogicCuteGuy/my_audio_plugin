@@ -30,7 +30,6 @@ pub struct PitchShifter {
 
     frame_size: u32,
     overlap: u32,
-    sample_rate: u32,
 
     //pitch
 
@@ -58,10 +57,10 @@ impl PitchShifter {
     /// rate of the buffer(s) you will provide to
     /// [`PitchShifter::shift_pitch`], which is how many values
     /// correspond to one second of audio in the buffer.
-    pub fn new(window_duration_ms: u8, sample_rate: u32, over_sampling: u8, shift: f32) -> Self {
-        let mut frame_size = sample_rate * window_duration_ms as u32 / 1000;
+    pub fn new(window_duration_ms: u8, sample_rate: u32, over_sampling: u8, shift: f32, hz_shift: f32) -> Self {
+        let mut frame_size: u32 = sample_rate * window_duration_ms as u32 / 1000;
         frame_size += frame_size % 2;
-        let fs_real = frame_size as f32;
+        let fs_real = frame_size;
 
         let double_frame_size = frame_size * 2;
 
@@ -74,11 +73,11 @@ impl PitchShifter {
 
         let mut windowing = vec![0.0; frame_size as usize];
         for k in 0..frame_size {
-            windowing[k as usize] = -0.5 * (TAU * (k as f32) / fs_real).cos() + 0.5;
+            windowing[k as usize] = -0.5 * (TAU * (k as f32) / fs_real as f32).cos() + 0.5;
         }
 
         //pitch
-        let shift = 2.0_f32.powf(shift / 12.0);
+        let shift = 2.0_f32.powf(shift / 12.0) + hz_shift;
         let fs_real = frame_size as f32;
         let half_frame_size = (frame_size / 2) + 1;
 
@@ -87,8 +86,7 @@ impl PitchShifter {
         let expected = TAU / (over_sampling as f32);
         let fifo_latency = frame_size - step;
         println!("{}", fifo_latency);
-        let mut overlap= 0;
-        overlap = fifo_latency;
+        let overlap= fifo_latency;
 
         let pitch_weight = shift * bin_frequencies;
         let oversamp_weight = ((over_sampling as f32) / TAU) * pitch_weight;
@@ -115,7 +113,6 @@ impl PitchShifter {
 
             frame_size,
             overlap,
-            sample_rate,
 
             fifo_latency,
             half_frame_size,
@@ -130,8 +127,8 @@ impl PitchShifter {
         }
     }
 
-    pub fn pitch(&mut self, shift: f32) {
-        self.shift = 2.0_f32.powf(shift / 12.0);
+    pub fn pitch(&mut self, shift: f32, hz_shift: f32) {
+        self.shift = 2.0_f32.powf(shift / 12.0) + hz_shift;
         self.pitch_weight = self.shift * self.bin_frequencies;
         self.oversamp_weight = ((self.over_sampling as f32) / TAU) * self.pitch_weight;
     }

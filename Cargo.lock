@@ -12,6 +12,7 @@ dependencies = [
  "pitch_shift",
  "plugin-canvas",
  "rust-music-theory",
+ "serde",
  "slint",
  "slint-build",
 ]

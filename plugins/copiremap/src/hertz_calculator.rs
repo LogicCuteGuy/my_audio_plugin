@@ -1,11 +1,6 @@
-use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
+use nih_plug::formatters;
+use nih_plug::params::{FloatParam,  Params};
 use nih_plug::prelude::FloatRange;
-
-pub struct HZCalculator {
-    pub hz_center: f32,
-
-    pub hz_tuning: f32
-}
 
 #[derive(Params)]
 pub struct HZCalculatorParams {
@@ -19,18 +14,30 @@ pub struct HZCalculatorParams {
 impl Default for HZCalculatorParams {
     fn default() -> Self {
         Self {
-            hz_center: FloatParam::new("Hz Center", 440.0, FloatRange::Linear{ min: 400.0, max: 500.0 }),
-            hz_tuning: FloatParam::new("Hz Tuning", 440.0, FloatRange::Linear{ min: 400.0, max: 500.0 })
+            hz_center: FloatParam::new("Hz Center", 440.0, FloatRange::Linear{ min: 415.3046976, max: 466.1637615 })
+                .with_value_to_string(formatters::v2s_f32_hz_then_khz(2))
+                .with_string_to_value(formatters::s2v_f32_hz_then_khz()),
+            hz_tuning: FloatParam::new("Hz Tuning", 440.0, FloatRange::Linear{ min: 415.3046976, max: 466.1637615 })
+                .with_value_to_string(formatters::v2s_f32_hz_then_khz(2))
+                .with_string_to_value(formatters::s2v_f32_hz_then_khz())
         }
     }
 }
 
-impl HZCalculator {
+impl HZCalculatorParams {
 
-}
-
-impl Default for HZCalculator {
-    fn default() -> Self {
-        Self { hz_center: 440.0, hz_tuning: 440.0 }
+    pub fn hz_center(&self, note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32) {
+        self.hz_cal(note, center_hz, low_pass, high_pass, self.hz_center.value())
     }
+
+    pub fn hz_tuning(&self, note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32) {
+        self.hz_cal(note, center_hz, low_pass, high_pass, self.hz_tuning.value())
+    }
+
+    fn hz_cal(&self, note: u8, center_hz: &mut f32, low_pass: &mut f32, high_pass: &mut f32, hz_cal: f32) {
+        *center_hz = hz_cal * 2.0_f32.powf((note as f32 - 45.0) / 12.0);
+        *low_pass = ((hz_cal * 2.0_f32.powf((note as f32 - 44.0) / 12.0)) + *center_hz) / 2.0;
+        *high_pass = ((hz_cal * 2.0_f32.powf((note as f32 - 46.0) / 12.0))+ *center_hz) / 2.0;
+    }
+
 }

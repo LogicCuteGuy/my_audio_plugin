@@ -7,7 +7,7 @@ impl Delay {
 
     pub fn new(delay: u32) -> Self {
         let mut delay_samples: Vec<f32> = Vec::new();
-        for i in 0..delay {
+        for _i in 0..delay {
             delay_samples.push(0.0);
         }
         Self {

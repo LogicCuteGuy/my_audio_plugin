@@ -14,6 +14,7 @@ slint.workspace = true
 pitch_shift.workspace = true
 iir_filters.workspace = true
 rust-music-theory.workspace = true
+serde = { version = "1.0.197", features = ["derive"] }
 
 [build-dependencies]
 slint-build = "1.5.1"

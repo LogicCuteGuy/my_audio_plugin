@@ -19,7 +19,7 @@ use slint::SharedString;
 use crate::audio_process::{AudioProcessNot, AudioProcessParams};
 use crate::hertz_calculator::HZCalculatorParams;
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
-use crate::note_table::NoteTable;
+use crate::note_table::NoteTables;
 
 const DB_MIN: f32 = -80.0;
 const DB_MAX: f32 = 20.0;
@@ -30,7 +30,7 @@ slint::include_modules!();
 pub struct PluginParams {
 
     #[persist = "note_table"]
-    pub note_table: Arc<NoteTable>,
+    pub note_table: Arc<NoteTables>,
 
     #[persist = "audio_process_not"]
     pub audio_process_not: Arc<AudioProcessNot>,
@@ -221,14 +221,14 @@ impl PluginComponentHandleParameterEvents for PluginComponent {
 
 pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
-
+    buffer_config: BufferConfig,
     midi_note: MidiNote,
 }
 
 impl Default for CoPiReMapPlugin {
     fn default() -> Self {
         let params = Arc::new(PluginParams {
-            note_table: Arc::new(NoteTable::default()),
+            note_table: Arc::new(NoteTables::default()),
             audio_process_not: Arc::new(AudioProcessNot { pitch_shift_window_duration_ms: 2 }),
             global: Arc::new(GlobalParams::default()),
             audio_process: Arc::new(AudioProcessParams::default()),
@@ -238,6 +238,12 @@ impl Default for CoPiReMapPlugin {
 
         Self {
             params,
+            buffer_config: BufferConfig {
+                sample_rate: 1.0,
+                min_buffer_size: None,
+                max_buffer_size: 0,
+                process_mode: ProcessMode::Realtime,
+            },
             midi_note: Default::default(),
         }
     }
@@ -275,11 +281,16 @@ impl Plugin for CoPiReMapPlugin {
     fn initialize(
         &mut self,
         _audio_io_layout: &AudioIOLayout,
-        _buffer_config: &BufferConfig,
+        buffer_config: &BufferConfig,
         _context: &mut impl InitContext<Self>
     ) -> bool
     {
+        self.buffer_config = *buffer_config;
         true
+    }
+
+    fn reset(&mut self) {
+
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
@@ -314,14 +325,14 @@ impl Plugin for CoPiReMapPlugin {
                     channel,
                     note,
                     velocity,
-                } => self.midi_note.note[note] = true,
+                } => self.midi_note.note[note as usize] = true,
                 NoteEvent::NoteOff {
                     timing,
                     voice_id,
                     channel,
                     note,
                     velocity,
-                } => self.midi_note.note[note] = false,
+                } => self.midi_note.note[note as usize] = false,
                 _ => (),
             }
         }

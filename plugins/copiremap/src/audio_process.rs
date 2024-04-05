@@ -1,6 +1,6 @@
 use nih_plug::formatters;
 use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
-use nih_plug::prelude::{FloatRange, IntRange};
+use nih_plug::prelude::{FloatRange, IntRange, SmoothingStyle};
 use nih_plug::util::db_to_gain;
 
 pub struct AudioProcessNot {
@@ -36,11 +36,8 @@ pub struct AudioProcessParams {
     #[id = "after_pitch_shift_bandpass"]
     pub after_pitch_shift_bandpass: BoolParam,
 
-    #[id = "high_bandwidth_after_pitch_shift_bandpass"]
-    pub high_bandwidth_after_pitch_shift_bandpass: FloatParam,
-
-    #[id = "low_bandwidth_after_pitch_shift_bandpass"]
-    pub low_bandwidth_after_pitch_shift_bandpass: FloatParam,
+    #[id = "bandwidth_after_pitch_shift_bandpass"]
+    pub bandwidth_after_pitch_shift_bandpass: FloatParam,
 
     #[id = "order_after_pitch_shift_bandpass"]
     pub order_after_pitch_shift_bandpass: IntParam,
@@ -115,26 +112,21 @@ impl Default for AudioProcessParams {
                 "After Pitch Shift Bandpass",
                 false,
             ),
-            high_bandwidth_after_pitch_shift_bandpass: FloatParam::new(
-                "High Bandwidth After Pitch Shift Bandpass",
+            bandwidth_after_pitch_shift_bandpass: FloatParam::new(
+                "Bandwidth After Pitch Shift Bandpass",
                 0.0,
                 FloatRange::Linear {
                     min: 0.0,
                     max: 1.0,
                 }
-            ),
-            low_bandwidth_after_pitch_shift_bandpass: FloatParam::new(
-                "Low Bandwidth After Pitch Shift Bandpass",
-                0.0,
-                FloatRange::Linear {
-                    min: 0.0,
-                    max: 1.0,
-                }
-            ),
+            ).with_unit("%")
+                .with_smoother(SmoothingStyle::Linear(15.0))
+                .with_value_to_string(formatters::v2s_f32_percentage(2))
+                .with_string_to_value(formatters::s2v_f32_percentage()),
             order_after_pitch_shift_bandpass: IntParam::new(
                 "Order After Pitch Shift Bandpass",
                 5,
-                IntParam::Linear {
+                IntRange::Linear {
                     min: 0,
                     max: 15,
                 }

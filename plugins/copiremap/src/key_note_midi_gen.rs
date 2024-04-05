@@ -1,8 +1,9 @@
 use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
 use nih_plug::prelude::{IntRange};
 use crate::audio_process::{AudioProcessNot, AudioProcessParams};
-use crate::note_table::NoteTable;
+use crate::note_table::NoteTables;
 use crate::{PluginParams};
+use std::sync::Arc;
 
 #[derive(Params)]
 pub struct KeyNoteParams {
@@ -63,7 +64,7 @@ impl Default for KeyNoteParams {
         Self {
             midi: BoolParam::new("Midi", false),
             repeat: BoolParam::new("Repeat", false),
-            find_off_key: IntParam::new("Find Off Key", 1, IntRange::Linear{ min: -48, max: 48 }),
+            find_off_key: IntParam::new("Find Off Key", 1, IntRange::Linear{ min: 0, max: 48 }),
             mute_not_find_off_key: BoolParam::new("Mute Not Find Off Key", false),
             round_up: BoolParam::new("Round Up", false),
             c: BoolParam::new("C", false),
@@ -103,7 +104,7 @@ impl MidiNote {
         Self::default()
     }
 
-    pub fn update(&mut self, params: &mut PluginParams) {
+    pub fn update(&self, params: &Arc<PluginParams>) {
         let mut notes: [i8; 128] = params.note_table.i2t;
         match params.key_note.midi.value() {
             true => {
@@ -124,71 +125,22 @@ impl MidiNote {
                         for i in 0..128 {
                             let a: u8 = i % 12;
                             match a {
-                                0 => { note_on_keys[i] = params.key_note.c.value(); }
-                                1 => { note_on_keys[i] = params.key_note.c_sharp.value(); }
-                                2 => { note_on_keys[i] = params.key_note.d.value(); }
-                                3 => { note_on_keys[i] = params.key_note.d_sharp.value(); }
-                                4 => { note_on_keys[i] = params.key_note.e.value(); }
-                                5 => { note_on_keys[i] = params.key_note.f.value(); }
-                                6 => { note_on_keys[i] = params.key_note.f_sharp.value(); }
-                                7 => { note_on_keys[i] = params.key_note.g.value(); }
-                                8 => { note_on_keys[i] = params.key_note.g_sharp.value(); }
-                                9 => { note_on_keys[i] = params.key_note.a.value(); }
-                                10 => { note_on_keys[i] = params.key_note.a_sharp.value(); }
-                                11 => { note_on_keys[i] = params.key_note.b.value(); }
+                                0 => { note_on_keys[i as usize] = params.key_note.c.value(); }
+                                1 => { note_on_keys[i as usize] = params.key_note.c_sharp.value(); }
+                                2 => { note_on_keys[i as usize] = params.key_note.d.value(); }
+                                3 => { note_on_keys[i as usize] = params.key_note.d_sharp.value(); }
+                                4 => { note_on_keys[i as usize] = params.key_note.e.value(); }
+                                5 => { note_on_keys[i as usize] = params.key_note.f.value(); }
+                                6 => { note_on_keys[i as usize] = params.key_note.f_sharp.value(); }
+                                7 => { note_on_keys[i as usize] = params.key_note.g.value(); }
+                                8 => { note_on_keys[i as usize] = params.key_note.g_sharp.value(); }
+                                9 => { note_on_keys[i as usize] = params.key_note.a.value(); }
+                                10 => { note_on_keys[i as usize] = params.key_note.a_sharp.value(); }
+                                11 => { note_on_keys[i as usize] = params.key_note.b.value(); }
                                 _ => {}
                             }
                         }
-                        for i in 0..params.key_note.find_off_key.value() {
-                            for (j, note_on_key) in note_on_keys.iter().enumerate() {
-                                match note_on_key {
-                                    true => {
-                                        match params.key_note.round_up.value() {
-                                            true => {
-                                                notes_sel[j] = 0;
-                                                if j - i as usize > -1 && notes_sel[j - i as usize] == 0 {
-
-                                                    notes_sel[j - i as usize] = 0;
-                                                    notes_sel[j - i as usize] = (i * -1) as i8;
-                                                }
-                                                if j + i as usize <= 127 && notes_sel[j + i as usize] == 0 {
-                                                    notes_sel[j + i as usize] = 0;
-                                                    notes_sel[j + i as usize] = i as i8;
-                                                }
-                                            }
-                                            false => {
-                                                let ii = 127 - i;
-                                                notes_sel[j] = 0;
-                                                if j - ii as usize > -1 && notes_sel[j - ii as usize] == 0 {
-                                                    notes_sel[j - ii as usize] = 0;
-                                                    notes_sel[j - ii as usize] = (ii * -1) as i8;
-                                                }
-                                                if j + ii as usize <= 127 && notes_sel[j + ii as usize] == 0 {
-                                                    notes_sel[j + ii as usize] = 0;
-                                                    notes_sel[j + ii as usize] = ii as i8;
-                                                }
-                                            }
-                                        }
-
-                                    }
-                                    false => {
-
-                                    }
-                                }
-                            }
-                        }
-                        match params.key_note.mute_not_find_off_key.value() {
-                            true => {
-
-                            }
-                            false => {
-                                for i in 0..128 {
-                                    if notes_sel[i] == -128 {
-                                        notes_sel[i] = 0;
-                                    }
-                                }
-                            }
-                        }
+                        self.find_off_key(params, &note_on_keys, &mut notes_sel);
                         notes = notes_sel;
                     }
                     false => {
@@ -200,20 +152,122 @@ impl MidiNote {
         params.note_table.i2t = notes;
     }
 
-}
+    pub fn update_midi(&self, params: &Arc<PluginParams>) {
+        let mut notes: [i8; 128] = params.note_table.im2t;
+        match params.key_note.midi.value() {
+            true => {
+                match params.key_note.repeat.value() {
+                    true => {
+                        let mut note_on_keys = [false; 128];
+                        let mut note_keys = [false; 12];
+                        let mut notes_sel: [i8; 128] = [-128; 128];
+                        for i in 0..128 {
+                            let a: u8 = i % 12;
+                            match self.note[i as usize] {
+                                true => { note_keys[a as usize] = true; }
+                                false => {}
+                            }
+                        }
+                        for i in 0..128 {
+                            let a: u8 = i % 12;
+                            match a {
+                                0 => { note_on_keys[i as usize] = note_keys[0]; }
+                                1 => { note_on_keys[i as usize] = note_keys[1]; }
+                                2 => { note_on_keys[i as usize] = note_keys[2]; }
+                                3 => { note_on_keys[i as usize] = note_keys[3]; }
+                                4 => { note_on_keys[i as usize] = note_keys[4]; }
+                                5 => { note_on_keys[i as usize] = note_keys[5]; }
+                                6 => { note_on_keys[i as usize] = note_keys[6]; }
+                                7 => { note_on_keys[i as usize] = note_keys[7]; }
+                                8 => { note_on_keys[i as usize] = note_keys[8]; }
+                                9 => { note_on_keys[i as usize] = note_keys[9]; }
+                                10 => { note_on_keys[i as usize] = note_keys[10]; }
+                                11 => { note_on_keys[i as usize] = note_keys[11]; }
+                                _ => {}
+                            }
+                        }
+                        self.find_off_key(params, &note_on_keys, &mut notes_sel);
+                        notes = notes_sel;
+                    }
+                    false => {
+                        let mut notes_sel: [i8; 128] = [-128; 128];
+                        self.find_off_key(params, &self.note, &mut notes_sel);
+                        notes = notes_sel;
+                    }
+                }
+            }
+            false => {
+                match params.key_note.repeat.value() {
+                    true => {
 
-#[cfg(test)]
-#[test]
-use std::sync::Arc;
-use crate::{GlobalParams};
-fn test_midi_note() {
-    let params = Arc::new(PluginParams {
-        note_table: Arc::new(NoteTable::default()),
-        audio_process_not: Arc::new(AudioProcessNot { pitch_shift_window_duration_ms: 2 }),
-        global: Arc::new(GlobalParams::default()),
-        audio_process: Arc::new(AudioProcessParams::default()),
-        hz_calculator: Arc::new(Default::default()),
-        key_note: Arc::new(Default::default()),
-    });
+                    }
+                    false => {
+
+                    }
+                }
+            }
+        }
+        params.note_table.im2t = notes;
+    }
+
+    fn find_off_key(&self, params: &Arc<PluginParams>, note_on_keys: &[bool; 128], notes_sel: &mut [i8; 128]) {
+        for i in 0..params.key_note.find_off_key.value() {
+            for (j, note_on_key) in note_on_keys.iter().enumerate() {
+                match note_on_key {
+                    true => {
+                        match params.key_note.round_up.value() {
+                            true => {
+                                notes_sel[j] = 0;
+                                if j as i8 - i as i8  > -1 && notes_sel[j - i as usize] == 0 {
+
+                                    notes_sel[j - i as usize] = 0;
+                                    notes_sel[j - i as usize] = i as i8;
+                                }
+                                if j + i as usize <= 127 && notes_sel[j + i as usize] == 0 {
+                                    notes_sel[j + i as usize] = 0;
+                                    notes_sel[j + i as usize] = (i * -1) as i8;
+                                }
+                            }
+                            false => {
+                                let ii = 127 - i;
+                                notes_sel[j] = 0;
+                                if j as i8 - ii as i8 > -1 && notes_sel[j - ii as usize] == 0 {
+                                    notes_sel[j - ii as usize] = 0;
+                                    notes_sel[j - ii as usize] = ii as i8;
+                                }
+                                if j + ii as usize <= 127 && notes_sel[j + ii as usize] == 0 {
+                                    notes_sel[j + ii as usize] = 0;
+                                    notes_sel[j + ii as usize] = (ii * -1) as i8;
+                                }
+                            }
+                        }
+
+                    }
+                    false => {
+
+                    }
+                }
+            }
+        }
+        match params.key_note.mute_not_find_off_key.value() {
+            true => {
+
+            }
+            false => {
+                for i in 0..128 {
+                    if notes_sel[i] == -128 {
+                        notes_sel[i] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn param_update(&self, params: &Arc<PluginParams>) {
+        match params.key_note.midi.value() {
+            true => self.update_midi(params),
+            false => self.update(params),
+        }
+    }
 
 }
