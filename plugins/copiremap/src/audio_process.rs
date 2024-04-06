@@ -125,6 +125,12 @@ pub struct AudioProcess {
     bpf: MyFilter,
     tune: MyPitch,
     after_tune_bpf: MyFilter,
+    note: u8,
+    center_hz: f32,
+    lowpass_hz: f32,
+    highpass_hz: f32,
+    pitch: i8,
+    pitch_hz: f32,
 }
 
 impl AudioProcess {
@@ -137,6 +143,12 @@ impl Default for AudioProcess {
             bpf: MyFilter::default(),
             tune: MyPitch::default(),
             after_tune_bpf: MyFilter::default(),
+            note: 0,
+            center_hz: 0.0,
+            lowpass_hz: 0.0,
+            highpass_hz: 0.0,
+            pitch: 0,
+            pitch_hz: 0.0,
         }
     }
 }

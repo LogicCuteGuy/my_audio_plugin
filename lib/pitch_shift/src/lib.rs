@@ -57,7 +57,7 @@ impl PitchShifter {
     /// rate of the buffer(s) you will provide to
     /// [`PitchShifter::shift_pitch`], which is how many values
     /// correspond to one second of audio in the buffer.
-    pub fn new(window_duration_ms: u8, sample_rate: u32, over_sampling: u8, shift: f32, hz_shift: f32) -> Self {
+    pub fn new(window_duration_ms: u8, sample_rate: u32, over_sampling: u8, shift: f32) -> Self {
         let mut frame_size: u32 = sample_rate * window_duration_ms as u32 / 1000;
         frame_size += frame_size % 2;
         let fs_real = frame_size;
@@ -77,7 +77,7 @@ impl PitchShifter {
         }
 
         //pitch
-        let shift = 2.0_f32.powf(shift / 12.0) + hz_shift;
+        let shift = shift;
         let fs_real = frame_size as f32;
         let half_frame_size = (frame_size / 2) + 1;
 
@@ -127,8 +127,8 @@ impl PitchShifter {
         }
     }
 
-    pub fn pitch(&mut self, shift: f32, hz_shift: f32) {
-        self.shift = 2.0_f32.powf(shift / 12.0) + hz_shift;
+    pub fn pitch(&mut self, shift: f32) {
+        self.shift = shift;
         self.pitch_weight = self.shift * self.bin_frequencies;
         self.oversamp_weight = ((self.over_sampling as f32) / TAU) * self.pitch_weight;
     }

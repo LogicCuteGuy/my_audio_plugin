@@ -101,17 +101,17 @@ impl Default for GlobalParams {
                 "Low Note Off",
                 0,
                 IntRange::Linear {
-                    min: 0,
-                    max: 127,
+                    min: 24,
+                    max: 107,
                 },
             ).with_value_to_string(formatters::v2s_i32_note_formatter())
                 .with_string_to_value(formatters::s2v_i32_note_formatter()),
             high_note_off: IntParam::new(
                 "High Note Off",
-                127,
+                83,
                 IntRange::Linear {
-                    min: 0,
-                    max: 127,
+                    min: 24,
+                    max: 107,
                 }
             ).with_value_to_string(formatters::v2s_i32_note_formatter())
                 .with_string_to_value(formatters::s2v_i32_note_formatter()),
@@ -372,14 +372,14 @@ impl Plugin for CoPiReMapPlugin {
                     channel,
                     note,
                     velocity,
-                } => self.midi_note.note[note as usize] = true,
+                } => if note >= 24 || note < 108 { self.midi_note.note[note - 24] = true },
                 NoteEvent::NoteOff {
                     timing,
                     voice_id,
                     channel,
                     note,
                     velocity,
-                } => self.midi_note.note[note as usize] = false,
+                } => if note >= 24 || note < 108 { self.midi_note.note[note - 24] = false },
                 _ => (),
             }
         }

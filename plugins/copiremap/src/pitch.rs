@@ -11,9 +11,9 @@ impl MyPitch {
         self.pitch[1] = PitchShifter::new(window_duration_ms, sample_rate as u32, over_sampling, shift, hz_shift);
     }
 
-    pub fn set_pitch(&mut self, shift: f32, hz_shift: f32) {
-        self.pitch[0].pitch(shift, hz_shift);
-        self.pitch[1].pitch(shift, hz_shift);
+    pub fn set_pitch(&mut self, shift: f32) {
+        self.pitch[0].pitch(shift);
+        self.pitch[1].pitch(shift);
     }
 
     pub fn over_sampling(&mut self, over_sampling: u8) {
@@ -40,8 +40,8 @@ impl Default for MyPitch {
     fn default() -> Self {
         Self {
             pitch: [
-                PitchShifter::new(2, 100, 1, 0.0, 0.0),
-                PitchShifter::new(2, 100, 1, 0.0, 0.0),
+                PitchShifter::new(2, 100, 1, 0.0),
+                PitchShifter::new(2, 100, 1, 0.0),
             ]
         }
     }
