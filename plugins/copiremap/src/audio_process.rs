@@ -2,6 +2,7 @@ use nih_plug::formatters;
 use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
 use nih_plug::prelude::{FloatRange, IntRange, SmoothingStyle};
 use nih_plug::util::db_to_gain;
+use crate::delay::Delay;
 use crate::filter::MyFilter;
 use crate::pitch::MyPitch;
 
@@ -123,32 +124,52 @@ impl Default for AudioProcessParams {
 
 pub struct AudioProcess {
     bpf: MyFilter,
-    tune: MyPitch,
+    tuning: MyPitch,
     after_tune_bpf: MyFilter,
+    delay: Delay,
     note: u8,
     center_hz: f32,
     lowpass_hz: f32,
     highpass_hz: f32,
     pitch: i8,
     pitch_hz: f32,
+    after_tune_lowpass_hz: f32,
+    after_tune_highpass_hz: f32,
 }
 
 impl AudioProcess {
+    pub fn reset(&mut self) {
+        self.tuning.reset();
+    }
 
+    pub fn get_latency(&self) -> u32 {
+        self.tuning.get_latency()
+    }
+
+    pub fn set_delay(&mut self, delay: u32) {
+        self.delay.set_delay(delay);
+    }
+
+    pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
+        input
+    }
 }
 
 impl Default for AudioProcess {
     fn default() -> Self {
         Self {
             bpf: MyFilter::default(),
-            tune: MyPitch::default(),
+            tuning: MyPitch::default(),
             after_tune_bpf: MyFilter::default(),
+            delay: Delay::default(),
             note: 0,
             center_hz: 0.0,
             lowpass_hz: 0.0,
             highpass_hz: 0.0,
             pitch: 0,
             pitch_hz: 0.0,
+            after_tune_lowpass_hz: 0.0,
+            after_tune_highpass_hz: 0.0,
         }
     }
 }

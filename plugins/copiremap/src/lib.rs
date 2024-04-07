@@ -19,6 +19,7 @@ use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
 use crate::audio_process::{AudioProcess, AudioProcessNot, AudioProcessParams};
+use crate::delay::{Delay, latency_average};
 use crate::filter::MyFilter;
 use crate::hertz_calculator::HZCalculatorParams;
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
@@ -264,9 +265,10 @@ pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
     buffer_config: BufferConfig,
     midi_note: MidiNote,
-    audio_process: [AudioProcess; 128],
+    audio_process: [AudioProcess; 84],
     lpf: MyFilter,
-    hpf: MyFilter
+    hpf: MyFilter,
+    delay: Delay
 }
 
 impl Default for CoPiReMapPlugin {
@@ -289,9 +291,10 @@ impl Default for CoPiReMapPlugin {
                 process_mode: ProcessMode::Realtime,
             },
             midi_note: MidiNote::default(),
-            audio_process: [AudioProcess::default(); 128],
+            audio_process: [AudioProcess::default(); 84],
             lpf: MyFilter::default(),
             hpf: MyFilter::default(),
+            delay: Delay::default(),
         }
     }
 }
@@ -337,7 +340,9 @@ impl Plugin for CoPiReMapPlugin {
     }
 
     fn reset(&mut self) {
-
+        for mut ap in self.audio_process {
+            ap.reset();
+        }
     }
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
@@ -364,31 +369,71 @@ impl Plugin for CoPiReMapPlugin {
         context: &mut impl ProcessContext<Self>
     ) -> ProcessStatus
     {
-        while let Some(event) = context.next_event() {
-            match event {
-                NoteEvent::NoteOn {
-                    timing,
-                    voice_id,
-                    channel,
-                    note,
-                    velocity,
-                } => if note >= 24 || note < 108 { self.midi_note.note[note - 24] = true },
-                NoteEvent::NoteOff {
-                    timing,
-                    voice_id,
-                    channel,
-                    note,
-                    velocity,
-                } => if note >= 24 || note < 108 { self.midi_note.note[note - 24] = false },
-                _ => (),
+        match self.params.global.bypass.value() {
+            true => {
+                if self.delay.get_latency() != 0 {
+                    self.delay.set_delay(0);
+                    context.set_latency_samples(0);
+                }
+            }
+            false => {
+                let latency = latency_average(&self.audio_process);
+                if self.delay.get_latency() != latency {
+                    self.delay.set_delay(latency);
+                    for ap in self.audio_process.iter_mut() {
+                        ap.set_delay(latency)
+                    }
+                    context.set_latency_samples(latency);
+                }
+                while let Some(event) = context.next_event() {
+                    match event {
+                        NoteEvent::NoteOn {
+                            timing,
+                            voice_id,
+                            channel,
+                            note,
+                            velocity,
+                        } => if note >= 24 || note < 108 { self.midi_note.note[note as usize - 24] = true },
+                        NoteEvent::NoteOff {
+                            timing,
+                            voice_id,
+                            channel,
+                            note,
+                            velocity,
+                        } => if note >= 24 || note < 108 { self.midi_note.note[note as usize - 24] = false },
+                        _ => (),
+                    }
+                }
+                for channel in buffer.as_slice() {
+                    let mut audio: [f32; 2] = [*channel.get(0).unwrap(), *channel.get(1).unwrap()];
+                    let delay = self.delay.process(audio);
+                    let lpf = self.lpf.process(delay);
+                    let hpf = self.hpf.process(delay);
+                    let lpf_mute = match self.params.global.low_note_off_mute.value() { true => [0.0, 0.0], false => lpf };
+                    let hpf_mute = match self.params.global.high_note_off_mute.value() { true => [0.0, 0.0], false => hpf };
+                    if audio[0] >= self.params.global.global_threshold.value() || audio[1] >= self.params.global.global_threshold.value() {
+                        let mut audio_process: [f32; 2] = [0.0; 2];
+                        for (i, ap) in self.audio_process.iter_mut().enumerate() {
+                            if i >= self.params.global.low_note_off.value() as usize - 24 && i <= self.params.global.high_note_off.value() as usize - 24 {
+                                let af = ap.process(audio);
+                                audio_process[0] *= af[0];
+                                audio_process[1] *= af[1];
+                            }
+                        }
+                        audio_process[0] *= self.params.global.wet_gain.value();
+                        audio_process[1] *= self.params.global.wet_gain.value();
+                        audio[0] = audio_process[0] + lpf_mute[0] + hpf_mute[0];
+                        audio[1] = audio_process[1] + lpf_mute[1] + hpf_mute[1];
+                    } else {
+                        audio[0] = delay[0] + lpf_mute[0] + hpf_mute[0];
+                        audio[1] = delay[1] + lpf_mute[1] + hpf_mute[1];
+                    }
+                    *channel.get_mut(0).unwrap() = audio[0];
+                    *channel.get_mut(1).unwrap() = audio[1];
+                }
             }
         }
 
-        for channel in buffer.as_slice() {
-            for sample in channel.iter_mut() {
-
-            }
-        }
         ProcessStatus::Normal
     }
 }

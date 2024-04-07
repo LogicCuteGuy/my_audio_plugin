@@ -100,9 +100,6 @@ impl Default for MidiNote {
 }
 
 impl MidiNote {
-    pub fn new() -> Self {
-        Self::default()
-    }
 
     pub fn update(&self, params: &Arc<PluginParams>) {
         let mut notes: [i8; 84] = params.note_table.i2t;

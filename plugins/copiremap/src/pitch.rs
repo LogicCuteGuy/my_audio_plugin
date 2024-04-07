@@ -6,9 +6,9 @@ pub struct MyPitch {
 
 impl MyPitch {
 
-    pub fn set_window_duration_ms(&mut self, window_duration_ms: u8, sample_rate: f32, over_sampling: u8, shift: f32, hz_shift: f32) {
-        self.pitch[0] = PitchShifter::new(window_duration_ms, sample_rate as u32, over_sampling, shift, hz_shift);
-        self.pitch[1] = PitchShifter::new(window_duration_ms, sample_rate as u32, over_sampling, shift, hz_shift);
+    pub fn set_window_duration_ms(&mut self, window_duration_ms: u8, sample_rate: f32, over_sampling: u8, shift: f32) {
+        self.pitch[0] = PitchShifter::new(window_duration_ms, sample_rate as u32, over_sampling, shift);
+        self.pitch[1] = PitchShifter::new(window_duration_ms, sample_rate as u32, over_sampling, shift);
     }
 
     pub fn set_pitch(&mut self, shift: f32) {

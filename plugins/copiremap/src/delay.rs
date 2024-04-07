@@ -1,31 +1,45 @@
+use crate::audio_process::AudioProcess;
+
 pub struct Delay {
-    pub delay: u32,
-    pub delay_samples: Vec<f32>,
+    delay_samples: [Vec<f32>; 2],
 }
 
 impl Delay {
 
-    pub fn new(delay: u32) -> Self {
-        let mut delay_samples: Vec<f32> = Vec::new();
-        for _i in 0..delay {
-            delay_samples.push(0.0);
+    pub fn set_delay(&mut self, delay: u32) {
+        self.delay_samples[0].resize(delay as usize, 0.0);
+        self.delay_samples[1].resize(delay as usize, 0.0);
+    }
+
+    pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
+        self.delay_samples[0].push(input[0]);
+        self.delay_samples[1].push(input[1]);
+        let out = self.delay_samples[0].get(0).unwrap().clone();
+        let out1 = self.delay_samples[1].get(0).unwrap().clone();
+        self.delay_samples[0].remove(0);
+        self.delay_samples[1].remove(0);
+        [out, out1]
+    }
+
+    pub fn get_latency(&self) -> u32 {
+        self.delay_samples[0].get(0).unwrap().len()
+    }
+
+}
+
+impl Default for Delay {
+    fn default() -> Self {
+        let mut delay_samples: [Vec<f32>; 2] = [Vec::new(); 2];
+        for _i in 0..1 {
+            delay_samples[0].push(0.0);
+            delay_samples[1].push(0.0);
         }
         Self {
-            delay,
             delay_samples,
         }
     }
+}
 
-    pub fn set_delay(&mut self, delay: u32) {
-        self.delay = delay;
-        self.delay_samples.resize(delay as usize, 0.0);
-    }
-
-    pub fn process(&mut self, input: f32) -> f32 {
-        self.delay_samples.push(input);
-        let out = self.delay_samples.get(0).unwrap().clone();
-        self.delay_samples.remove(0);
-        out
-    }
-
+pub fn latency_average(ap: &[AudioProcess; 84]) -> u32 {
+    ap[0].get_latency()
 }
