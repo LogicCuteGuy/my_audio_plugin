@@ -18,15 +18,13 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
+use iir_filters::filter_design::FilterType;
 use crate::audio_process::{AudioProcess, AudioProcessNot, AudioProcessParams};
 use crate::delay::{Delay, latency_average};
 use crate::filter::MyFilter;
-use crate::hertz_calculator::HZCalculatorParams;
+use crate::hertz_calculator::{hz_cal_clh, HZCalculatorParams};
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
 use crate::note_table::NoteTables;
-
-const DB_MIN: f32 = -80.0;
-const DB_MAX: f32 = 20.0;
 
 slint::include_modules!();
 
@@ -86,8 +84,8 @@ impl Default for GlobalParams {
                 .with_value_to_string(formatters::v2s_bool_bypass())
                 .with_string_to_value(formatters::s2v_bool_bypass()),
             wet_gain: FloatParam::new("Wet Gain", db_to_gain(0.0), FloatRange::Skewed {
-                min: db_to_gain(-30.0),
-                max: db_to_gain(20.0),
+                min: db_to_gain(-24.0),
+                max: db_to_gain(12.0),
                 factor: FloatRange::gain_skew_factor(-30.0, 20.0),
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
@@ -100,7 +98,7 @@ impl Default for GlobalParams {
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             low_note_off: IntParam::new(
                 "Low Note Off",
-                0,
+                24,
                 IntRange::Linear {
                     min: 24,
                     max: 107,
@@ -109,7 +107,7 @@ impl Default for GlobalParams {
                 .with_string_to_value(formatters::s2v_i32_note_formatter()),
             high_note_off: IntParam::new(
                 "High Note Off",
-                83,
+                107,
                 IntRange::Linear {
                     min: 24,
                     max: 107,
@@ -268,7 +266,7 @@ pub struct CoPiReMapPlugin {
     audio_process: [AudioProcess; 84],
     lpf: MyFilter,
     hpf: MyFilter,
-    delay: Delay
+    delay: Delay,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -307,7 +305,7 @@ impl Plugin for CoPiReMapPlugin {
     const VENDOR: &'static str = "LogicCuteGuy";
     const URL: &'static str = "copiremap.logiccuteguy.com";
     const EMAIL: &'static str = "contact@logiccuteguy.com";
-    const VERSION: &'static str = "0.0";
+    const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
     const MIDI_INPUT: MidiConfig = MidiConfig::MidiCCs;
     const MIDI_OUTPUT: MidiConfig = MidiConfig::MidiCCs;
@@ -321,8 +319,7 @@ impl Plugin for CoPiReMapPlugin {
         }
     ];
 
-    const SAMPLE_ACCURATE_AUTOMATION: bool = false;
-    const HARD_REALTIME_ONLY: bool = false;
+    const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
@@ -344,6 +341,8 @@ impl Plugin for CoPiReMapPlugin {
             ap.reset();
         }
     }
+
+
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let window_attributes = WindowAttributes::new(

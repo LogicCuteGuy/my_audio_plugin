@@ -10,8 +10,8 @@ pub struct MyFilter {
 
 impl MyFilter {
 
-    pub fn set_filter(&mut self, order: u32, filter: FilterType, sample_rate: f32) {
-        self.zpk = butter(order, filter, sample_rate)?;
+    pub fn set_filter(&mut self, order: u8, filter: FilterType, sample_rate: f32) {
+        self.zpk = butter(order as u32, filter, sample_rate)?;
     }
 
     pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
