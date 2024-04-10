@@ -12,17 +12,21 @@ impl MyPitch {
     }
 
     pub fn set_pitch(&mut self, shift: f32) {
-        self.pitch[0].pitch(shift);
-        self.pitch[1].pitch(shift);
+        self.pitch[0].set_pitch(shift);
+        self.pitch[1].set_pitch(shift);
     }
 
-    pub fn over_sampling(&mut self, over_sampling: u8) {
-        self.pitch[0].over_sampling(over_sampling);
-        self.pitch[1].over_sampling(over_sampling);
+    pub fn set_over_sampling(&mut self, over_sampling: u8) {
+        self.pitch[0].set_over_sampling(over_sampling);
+        self.pitch[1].set_over_sampling(over_sampling);
     }
 
     pub fn get_latency(&self) -> u32 {
         (self.pitch[0].get_latency() + self.pitch[1].get_latency()) / 2
+    }
+
+    pub fn get_pitch(&self) -> f32 {
+        (self.pitch[0].get_pitch() + self.pitch[1].get_pitch()) / 2.0
     }
 
     pub fn reset(&mut self) {

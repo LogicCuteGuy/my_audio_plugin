@@ -8,6 +8,7 @@ mod pitch;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use nih_plug::util::db_to_gain;
 use nih_plug::{nih_export_clap, nih_export_vst3};
@@ -22,7 +23,7 @@ use iir_filters::filter_design::FilterType;
 use crate::audio_process::{AudioProcess, AudioProcessNot, AudioProcessParams};
 use crate::delay::{Delay, latency_average};
 use crate::filter::MyFilter;
-use crate::hertz_calculator::{hz_cal_clh, HZCalculatorParams};
+use crate::hertz_calculator::{hz_cal_clh};
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
 use crate::note_table::NoteTables;
 
@@ -42,9 +43,6 @@ pub struct PluginParams {
 
     #[nested(group = "audio_process")]
     pub audio_process: Arc<AudioProcessParams>,
-
-    #[nested(group = "hz_calculator")]
-    pub hz_calculator: Arc<HZCalculatorParams>,
 
     #[nested(group = "key_note")]
     pub key_note: Arc<KeyNoteParams>,
@@ -75,14 +73,23 @@ pub struct GlobalParams {
     #[id = "high_note_off_mute"]
     pub high_note_off_mute: BoolParam,
 
+    #[id = "order"]
+    pub order: IntParam,
+
+    #[id = "hz_center"]
+    pub hz_center: FloatParam,
+
+    #[id = "hz_tuning"]
+    pub hz_tuning: FloatParam,
 }
 
-impl Default for GlobalParams {
-    fn default() -> Self {
+impl GlobalParams {
+    fn new(update_lowpass: Arc<AtomicBool>, update_highpass: Arc<AtomicBool>, update_bpf_center_hz: Arc<AtomicBool>, update_pitch_shift_and_after_bandpass: Arc<AtomicBool>) -> Self {
         Self {
             bypass: BoolParam::new("Bypass", false)
                 .with_value_to_string(formatters::v2s_bool_bypass())
-                .with_string_to_value(formatters::s2v_bool_bypass()),
+                .with_string_to_value(formatters::s2v_bool_bypass())
+                .make_bypass(),
             wet_gain: FloatParam::new("Wet Gain", db_to_gain(0.0), FloatRange::Skewed {
                 min: db_to_gain(-24.0),
                 max: db_to_gain(12.0),
@@ -104,7 +111,14 @@ impl Default for GlobalParams {
                     max: 107,
                 },
             ).with_value_to_string(formatters::v2s_i32_note_formatter())
-                .with_string_to_value(formatters::s2v_i32_note_formatter()),
+                .with_string_to_value(formatters::s2v_i32_note_formatter())
+                .with_callback(
+                {
+                    Arc::new(move |_| {
+                        update_lowpass.store(true, Ordering::Release);
+                    })
+                }
+            ),
             high_note_off: IntParam::new(
                 "High Note Off",
                 107,
@@ -113,7 +127,14 @@ impl Default for GlobalParams {
                     max: 107,
                 }
             ).with_value_to_string(formatters::v2s_i32_note_formatter())
-                .with_string_to_value(formatters::s2v_i32_note_formatter()),
+                .with_string_to_value(formatters::s2v_i32_note_formatter())
+                .with_callback(
+                    {
+                        Arc::new(move |_| {
+                            update_highpass.store(true, Ordering::Release);
+                        })
+                    }
+                ),
             low_note_off_mute: BoolParam::new(
                 "Low Note Off Mute",
                 false,
@@ -122,6 +143,44 @@ impl Default for GlobalParams {
                 "High Note Off Mute",
                 false,
             ),
+            order: IntParam::new(
+                "Order",
+                5,
+                IntRange::Linear {
+                    min: 0,
+                    max: 15,
+                },
+            ).with_callback(
+                {
+                    Arc::new(move |_| {
+                        update_lowpass.store(true, Ordering::Release);
+                        update_highpass.store(true, Ordering::Release);
+                        update_bpf_center_hz.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            hz_center: FloatParam::new("Hz Center", 440.0, FloatRange::Linear{ min: 415.3046976, max: 466.1637615 })
+                .with_value_to_string(formatters::v2s_f32_hz_then_khz(2))
+                .with_string_to_value(formatters::s2v_f32_hz_then_khz())
+                .with_callback(
+                {
+                    Arc::new(move |_| {
+                        update_bpf_center_hz.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            hz_tuning: FloatParam::new("Hz Tuning", 440.0, FloatRange::Linear{ min: 415.3046976, max: 466.1637615 })
+                .with_value_to_string(formatters::v2s_f32_hz_then_khz(2))
+                .with_string_to_value(formatters::s2v_f32_hz_then_khz())
+                .with_callback(
+                {
+                    Arc::new(move |_| {
+                        update_lowpass.store(true, Ordering::Release);
+                        update_highpass.store(true, Ordering::Release);
+                        update_pitch_shift_and_after_bandpass.store(true, Ordering::Release);
+                    })
+                }
+            )
         }
     }
 }
@@ -267,21 +326,32 @@ pub struct CoPiReMapPlugin {
     lpf: MyFilter,
     hpf: MyFilter,
     delay: Delay,
+
+    update_lowpass: Arc<AtomicBool>,
+    update_highpass: Arc<AtomicBool>,
+
+    update_pitch_shift_and_after_bandpass: Arc<AtomicBool>,
+    update_pitch_shift_over_sampling: Arc<AtomicBool>,
+    update_bpf_center_hz: Arc<AtomicBool>,
 }
 
 impl Default for CoPiReMapPlugin {
     fn default() -> Self {
-        let params = Arc::new(PluginParams {
-            note_table: Arc::new(NoteTables::default()),
-            audio_process_not: Arc::new(AudioProcessNot { pitch_shift_window_duration_ms: 2 }),
-            global: Arc::new(GlobalParams::default()),
-            audio_process: Arc::new(AudioProcessParams::default()),
-            hz_calculator: Arc::new(Default::default()),
-            key_note: Arc::new(Default::default()),
-        });
+        let update_lowpass = Arc::new(AtomicBool::new(false));
+        let update_highpass = Arc::new(AtomicBool::new(false));
+
+        let update_pitch_shift_and_after_bandpass = Arc::new(AtomicBool::new(false));
+        let update_pitch_shift_over_sampling = Arc::new(AtomicBool::new(false));
+        let update_bpf_center_hz = Arc::new(AtomicBool::new(false));
 
         Self {
-            params,
+            params: Arc::new(PluginParams {
+                note_table: Arc::new(NoteTables::default()),
+                audio_process_not: Arc::new(AudioProcessNot { pitch_shift_window_duration_ms: 2 }),
+                global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone())),
+                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_and_after_bandpass.clone(), update_pitch_shift_over_sampling.clone())),
+                key_note: Arc::new(Default::default()),
+            }),
             buffer_config: BufferConfig {
                 sample_rate: 1.0,
                 min_buffer_size: None,
@@ -293,6 +363,11 @@ impl Default for CoPiReMapPlugin {
             lpf: MyFilter::default(),
             hpf: MyFilter::default(),
             delay: Delay::default(),
+            update_lowpass,
+            update_highpass,
+            update_pitch_shift_and_after_bandpass,
+            update_pitch_shift_over_sampling,
+            update_bpf_center_hz
         }
     }
 }
@@ -333,6 +408,9 @@ impl Plugin for CoPiReMapPlugin {
     ) -> bool
     {
         self.buffer_config = *buffer_config;
+        for (i, audio_process) in self.audio_process.iter_mut().enumerate() {
+            audio_process.setup(&self, (i + 24) as u8);
+        }
         true
     }
 
@@ -341,8 +419,6 @@ impl Plugin for CoPiReMapPlugin {
             ap.reset();
         }
     }
-
-
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let window_attributes = WindowAttributes::new(
@@ -384,6 +460,20 @@ impl Plugin for CoPiReMapPlugin {
                     }
                     context.set_latency_samples(latency);
                 }
+                if self
+                    .update_lowpass
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    self.update_lpf()
+                }
+                if self
+                    .update_lowpass
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    self.update_hpf()
+                }
                 while let Some(event) = context.next_event() {
                     match event {
                         NoteEvent::NoteOn {
@@ -414,7 +504,7 @@ impl Plugin for CoPiReMapPlugin {
                         let mut audio_process: [f32; 2] = [0.0; 2];
                         for (i, ap) in self.audio_process.iter_mut().enumerate() {
                             if i >= self.params.global.low_note_off.value() as usize - 24 && i <= self.params.global.high_note_off.value() as usize - 24 {
-                                let af = ap.process(audio);
+                                let af = ap.process(audio, &self);
                                 audio_process[0] *= af[0];
                                 audio_process[1] *= af[1];
                             }
@@ -432,9 +522,36 @@ impl Plugin for CoPiReMapPlugin {
                 }
             }
         }
-
         ProcessStatus::Normal
     }
+}
+
+impl CoPiReMapPlugin {
+
+    pub fn update_lpf(&mut self) {
+        let mut lowpass: f32 = 0.0;
+        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut lowpass, &mut 0.0, self.params.global.hz_tuning.value());
+        self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate)
+    }
+
+    pub fn update_hpf(&mut self) {
+        let mut highpass: f32 = 0.0;
+        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
+        self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate)
+    }
+
+    pub fn update_psaabp(&mut self) {
+
+    }
+
+    pub fn update_psos(&mut self) {
+
+    }
+
+    pub fn update_bpfchz(&mut self) {
+
+    }
+
 }
 
 impl ClapPlugin for CoPiReMapPlugin {

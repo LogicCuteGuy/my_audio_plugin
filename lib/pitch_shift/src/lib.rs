@@ -127,13 +127,13 @@ impl PitchShifter {
         }
     }
 
-    pub fn pitch(&mut self, shift: f32) {
+    pub fn set_pitch(&mut self, shift: f32) {
         self.shift = shift;
         self.pitch_weight = self.shift * self.bin_frequencies;
         self.oversamp_weight = ((self.over_sampling as f32) / TAU) * self.pitch_weight;
     }
 
-    pub fn over_sampling(&mut self, over_sampling: u8) {
+    pub fn set_over_sampling(&mut self, over_sampling: u8) {
         self.step = self.frame_size / over_sampling as u32;
         self.expected = TAU / (over_sampling as f32);
         self.fifo_latency = self.frame_size - self.step;
@@ -142,8 +142,14 @@ impl PitchShifter {
         self.mean_expected = self.expected / self.bin_frequencies;
     }
 
+    #[inline]
     pub fn get_latency(&self) -> u32 {
         self.fifo_latency
+    }
+
+    #[inline]
+    pub fn get_pitch(&self) -> f32 {
+        self.shift
     }
 
     pub fn reset(&mut self) {
