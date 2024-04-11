@@ -15,6 +15,7 @@ pitch_shift.workspace = true
 iir_filters.workspace = true
 rust-music-theory.workspace = true
 serde = { version = "1.0.197", features = ["derive"] }
+crossbeam = "0.8.4"
 
 [build-dependencies]
 slint-build = "1.5.1"

@@ -20,10 +20,10 @@ use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
 use iir_filters::filter_design::FilterType;
-use crate::audio_process::{AudioProcess, AudioProcessNot, AudioProcessParams};
+use crate::audio_process::{AudioProcess, AudioProcessParams};
 use crate::delay::{Delay, latency_average};
 use crate::filter::MyFilter;
-use crate::hertz_calculator::{hz_cal_clh};
+use crate::hertz_calculator::hz_cal_clh;
 use crate::key_note_midi_gen::{KeyNoteParams, MidiNote};
 use crate::note_table::NoteTables;
 
@@ -34,9 +34,6 @@ pub struct PluginParams {
 
     #[persist = "note_table"]
     pub note_table: Arc<NoteTables>,
-
-    #[persist = "audio_process_not"]
-    pub audio_process_not: Arc<AudioProcessNot>,
 
     #[nested(group = "global")]
     pub global: Arc<GlobalParams>,
@@ -114,6 +111,7 @@ impl GlobalParams {
                 .with_string_to_value(formatters::s2v_i32_note_formatter())
                 .with_callback(
                 {
+                    let update_lowpass = update_lowpass.clone();
                     Arc::new(move |_| {
                         update_lowpass.store(true, Ordering::Release);
                     })
@@ -130,6 +128,7 @@ impl GlobalParams {
                 .with_string_to_value(formatters::s2v_i32_note_formatter())
                 .with_callback(
                     {
+                        let update_highpass = update_highpass.clone();
                         Arc::new(move |_| {
                             update_highpass.store(true, Ordering::Release);
                         })
@@ -152,6 +151,9 @@ impl GlobalParams {
                 },
             ).with_callback(
                 {
+                    let update_lowpass = update_lowpass.clone();
+                    let update_highpass = update_highpass.clone();
+                    let update_bpf_center_hz = update_bpf_center_hz.clone();
                     Arc::new(move |_| {
                         update_lowpass.store(true, Ordering::Release);
                         update_highpass.store(true, Ordering::Release);
@@ -164,6 +166,7 @@ impl GlobalParams {
                 .with_string_to_value(formatters::s2v_f32_hz_then_khz())
                 .with_callback(
                 {
+                    let update_bpf_center_hz = update_bpf_center_hz.clone();
                     Arc::new(move |_| {
                         update_bpf_center_hz.store(true, Ordering::Release);
                     })
@@ -174,6 +177,9 @@ impl GlobalParams {
                 .with_string_to_value(formatters::s2v_f32_hz_then_khz())
                 .with_callback(
                 {
+                    let update_lowpass = update_lowpass.clone();
+                    let update_highpass = update_highpass.clone();
+                    let update_pitch_shift_and_after_bandpass = update_pitch_shift_and_after_bandpass.clone();
                     Arc::new(move |_| {
                         update_lowpass.store(true, Ordering::Release);
                         update_highpass.store(true, Ordering::Release);
@@ -332,7 +338,10 @@ pub struct CoPiReMapPlugin {
 
     update_pitch_shift_and_after_bandpass: Arc<AtomicBool>,
     update_pitch_shift_over_sampling: Arc<AtomicBool>,
+    update_pitch_shift_window_duration_ms: Arc<AtomicBool>,
     update_bpf_center_hz: Arc<AtomicBool>,
+
+    update_key_note: Arc<AtomicBool>,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -342,15 +351,18 @@ impl Default for CoPiReMapPlugin {
 
         let update_pitch_shift_and_after_bandpass = Arc::new(AtomicBool::new(false));
         let update_pitch_shift_over_sampling = Arc::new(AtomicBool::new(false));
+        let update_pitch_shift_window_duration_ms = Arc::new(AtomicBool::new(false));
         let update_bpf_center_hz = Arc::new(AtomicBool::new(false));
 
+        let update_key_note = Arc::new(AtomicBool::new(false));
+
+        let audio_process = core::array::from_fn(|_| AudioProcess::default());
         Self {
             params: Arc::new(PluginParams {
                 note_table: Arc::new(NoteTables::default()),
-                audio_process_not: Arc::new(AudioProcessNot { pitch_shift_window_duration_ms: 2 }),
                 global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone())),
-                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_and_after_bandpass.clone(), update_pitch_shift_over_sampling.clone())),
-                key_note: Arc::new(Default::default()),
+                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_and_after_bandpass.clone(), update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone())),
+                key_note: Arc::new(KeyNoteParams::new(update_key_note.clone())),
             }),
             buffer_config: BufferConfig {
                 sample_rate: 1.0,
@@ -359,7 +371,7 @@ impl Default for CoPiReMapPlugin {
                 process_mode: ProcessMode::Realtime,
             },
             midi_note: MidiNote::default(),
-            audio_process: [AudioProcess::default(); 84],
+            audio_process,
             lpf: MyFilter::default(),
             hpf: MyFilter::default(),
             delay: Delay::default(),
@@ -367,7 +379,9 @@ impl Default for CoPiReMapPlugin {
             update_highpass,
             update_pitch_shift_and_after_bandpass,
             update_pitch_shift_over_sampling,
-            update_bpf_center_hz
+            update_pitch_shift_window_duration_ms,
+            update_bpf_center_hz,
+            update_key_note
         }
     }
 }
@@ -415,7 +429,7 @@ impl Plugin for CoPiReMapPlugin {
     }
 
     fn reset(&mut self) {
-        for mut ap in self.audio_process {
+        for ap in self.audio_process.iter_mut() {
             ap.reset();
         }
     }
@@ -465,14 +479,59 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    self.update_lpf()
+                    let mut lowpass: f32 = 0.0;
+                    hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut lowpass, &mut 0.0, self.params.global.hz_tuning.value());
+                    self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate)
                 }
                 if self
                     .update_lowpass
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    self.update_hpf()
+                    let mut highpass: f32 = 0.0;
+                    hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
+                    self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate)
+                }
+                if self
+                    .update_bpf_center_hz
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    for ap in self.audio_process.iter_mut() {
+                        ap.set_bpf_center_hz(&self);
+                    }
+                }
+                if self
+                    .update_pitch_shift_and_after_bandpass
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    self.fn_update_pitch_shift_and_after_bandpass();
+                }
+                if self
+                    .update_pitch_shift_over_sampling
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    for ap in self.audio_process.iter_mut() {
+                        ap.set_pitch_shift_over_sampling(&self);
+                    }
+                }
+                if self
+                    .update_pitch_shift_window_duration_ms
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    for ap in self.audio_process.iter_mut() {
+                        ap.set_pitch_shift_window_duration_ms(&self);
+                    }
+                }
+                if self
+                    .update_key_note
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    self.midi_note.param_update(&self);
                 }
                 while let Some(event) = context.next_event() {
                     match event {
@@ -528,28 +587,14 @@ impl Plugin for CoPiReMapPlugin {
 
 impl CoPiReMapPlugin {
 
-    pub fn update_lpf(&mut self) {
-        let mut lowpass: f32 = 0.0;
-        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut lowpass, &mut 0.0, self.params.global.hz_tuning.value());
-        self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate)
-    }
-
-    pub fn update_hpf(&mut self) {
-        let mut highpass: f32 = 0.0;
-        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
-        self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate)
-    }
-
-    pub fn update_psaabp(&mut self) {
-
-    }
-
-    pub fn update_psos(&mut self) {
-
-    }
-
-    pub fn update_bpfchz(&mut self) {
-
+    pub fn fn_update_pitch_shift_and_after_bandpass(&self) {
+        let note_pitch: [i8; 84] = match self.params.key_note.midi.value() {
+            true => {self.params.note_table.im2t.load().i84}
+            false => {self.params.note_table.i2t.load().i84}
+        };
+        for (i, ap) in self.audio_process.iter_mut().enumerate() {
+            ap.set_pitch_shift_and_after_bandpass(&self, note_pitch[i]);
+        }
     }
 
 }

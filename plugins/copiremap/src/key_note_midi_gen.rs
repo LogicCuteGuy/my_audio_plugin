@@ -1,9 +1,9 @@
-use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
+use nih_plug::params::{BoolParam, IntParam, Params};
 use nih_plug::prelude::{IntRange};
-use crate::audio_process::{AudioProcessNot, AudioProcessParams};
-use crate::note_table::NoteTables;
-use crate::{PluginParams};
+use crate::{CoPiReMapPlugin};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use crate::note_table::NoteTablesArray;
 
 #[derive(Params)]
 pub struct KeyNoteParams {
@@ -59,26 +59,163 @@ pub struct KeyNoteParams {
     pub b: BoolParam,
 }
 
-impl Default for KeyNoteParams {
-    fn default() -> Self {
+impl KeyNoteParams {
+    pub fn new(update_key_note: Arc<AtomicBool>) -> Self {
+
         Self {
-            midi: BoolParam::new("Midi", false),
-            repeat: BoolParam::new("Repeat", false),
-            find_off_key: IntParam::new("Find Off Key", 1, IntRange::Linear{ min: 0, max: 48 }),
-            mute_not_find_off_key: BoolParam::new("Mute Not Find Off Key", false),
-            round_up: BoolParam::new("Round Up", false),
-            c: BoolParam::new("C", false),
-            c_sharp: BoolParam::new("C#", false),
-            d: BoolParam::new("D", false),
-            d_sharp: BoolParam::new("D#", false),
-            e: BoolParam::new("E", false),
-            f: BoolParam::new("F", false),
-            f_sharp: BoolParam::new("F#", false),
-            g: BoolParam::new("G", false),
-            g_sharp: BoolParam::new("G#", false),
-            a: BoolParam::new("A", false),
-            a_sharp: BoolParam::new("A#", false),
-            b: BoolParam::new("B", false),
+            midi: BoolParam::new("Midi", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            repeat: BoolParam::new("Repeat", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            find_off_key: IntParam::new("Find Off Key", 1, IntRange::Linear{ min: 0, max: 48 })
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            mute_not_find_off_key: BoolParam::new("Mute Not Find Off Key", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            round_up: BoolParam::new("Round Up", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            c: BoolParam::new("C", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            c_sharp: BoolParam::new("C#", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            d: BoolParam::new("D", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            d_sharp: BoolParam::new("D#", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            e: BoolParam::new("E", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            f: BoolParam::new("F", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            f_sharp: BoolParam::new("F#", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            g: BoolParam::new("G", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            g_sharp: BoolParam::new("G#", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            a: BoolParam::new("A", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            a_sharp: BoolParam::new("A#", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
+            b: BoolParam::new("B", false)
+                .with_callback(
+                {
+                    let update_key_note = update_key_note.clone();
+                    Arc::new(move |_| {
+                        update_key_note.store(true, Ordering::Release);
+                    })
+                }
+            ),
         }
     }
 }
@@ -101,42 +238,43 @@ impl Default for MidiNote {
 
 impl MidiNote {
 
-    pub fn update(&self, params: &Arc<PluginParams>) {
-        let mut notes: [i8; 84] = params.note_table.i2t;
-        match params.key_note.repeat.value() {
+    pub fn update(&self, plugin: &CoPiReMapPlugin) {
+        let mut notes: [i8; 84] = plugin.params.note_table.i2t.load().i84;
+        match plugin.params.key_note.repeat.value() {
             true => {
                 let mut note_on_keys = [false; 84];
                 let mut notes_sel: [i8; 84] = [-128; 84];
                 for i in 0..84 {
                     let a: u8 = i % 12;
                     match a {
-                        0 => { note_on_keys[i as usize] = params.key_note.c.value(); }
-                        1 => { note_on_keys[i as usize] = params.key_note.c_sharp.value(); }
-                        2 => { note_on_keys[i as usize] = params.key_note.d.value(); }
-                        3 => { note_on_keys[i as usize] = params.key_note.d_sharp.value(); }
-                        4 => { note_on_keys[i as usize] = params.key_note.e.value(); }
-                        5 => { note_on_keys[i as usize] = params.key_note.f.value(); }
-                        6 => { note_on_keys[i as usize] = params.key_note.f_sharp.value(); }
-                        7 => { note_on_keys[i as usize] = params.key_note.g.value(); }
-                        8 => { note_on_keys[i as usize] = params.key_note.g_sharp.value(); }
-                        9 => { note_on_keys[i as usize] = params.key_note.a.value(); }
-                        10 => { note_on_keys[i as usize] = params.key_note.a_sharp.value(); }
-                        11 => { note_on_keys[i as usize] = params.key_note.b.value(); }
+                        0 => { note_on_keys[i as usize] = plugin.params.key_note.c.value(); }
+                        1 => { note_on_keys[i as usize] = plugin.params.key_note.c_sharp.value(); }
+                        2 => { note_on_keys[i as usize] = plugin.params.key_note.d.value(); }
+                        3 => { note_on_keys[i as usize] = plugin.params.key_note.d_sharp.value(); }
+                        4 => { note_on_keys[i as usize] = plugin.params.key_note.e.value(); }
+                        5 => { note_on_keys[i as usize] = plugin.params.key_note.f.value(); }
+                        6 => { note_on_keys[i as usize] = plugin.params.key_note.f_sharp.value(); }
+                        7 => { note_on_keys[i as usize] = plugin.params.key_note.g.value(); }
+                        8 => { note_on_keys[i as usize] = plugin.params.key_note.g_sharp.value(); }
+                        9 => { note_on_keys[i as usize] = plugin.params.key_note.a.value(); }
+                        10 => { note_on_keys[i as usize] = plugin.params.key_note.a_sharp.value(); }
+                        11 => { note_on_keys[i as usize] = plugin.params.key_note.b.value(); }
                         _ => {}
                     }
                 }
-                self.find_off_key(params, &note_on_keys, &mut notes_sel);
+                self.find_off_key(plugin, &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
             false => {
             }
         }
-        params.note_table.i2t = notes;
+        plugin.params.note_table.i2t.store(NoteTablesArray { i84: notes});
+        plugin.fn_update_pitch_shift_and_after_bandpass();
     }
 
-    pub fn update_midi(&self, params: &Arc<PluginParams>) {
-        let mut notes: [i8; 84] = params.note_table.im2t;
-        match params.key_note.repeat.value() {
+    pub fn update_midi(&self, plugin: &CoPiReMapPlugin) {
+        let mut notes: [i8; 84] = plugin.params.note_table.im2t.load().i84;
+        match plugin.params.key_note.repeat.value() {
             true => {
                 let mut note_on_keys = [false; 84];
                 let mut note_keys = [false; 12];
@@ -166,24 +304,25 @@ impl MidiNote {
                         _ => {}
                     }
                 }
-                self.find_off_key(params, &note_on_keys, &mut notes_sel);
+                self.find_off_key(plugin, &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
             false => {
                 let mut notes_sel: [i8; 84] = [-128; 84];
-                self.find_off_key(params, &self.note, &mut notes_sel);
+                self.find_off_key(plugin, &self.note, &mut notes_sel);
                 notes = notes_sel;
             }
         }
-        params.note_table.im2t = notes;
+        plugin.params.note_table.im2t.store(NoteTablesArray { i84: notes});
+        plugin.fn_update_pitch_shift_and_after_bandpass();
     }
 
-    fn find_off_key(&self, params: &Arc<PluginParams>, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
-        for i in 0..params.key_note.find_off_key.value() {
+    fn find_off_key(&self, plugin: &CoPiReMapPlugin, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
+        for i in 0..plugin.params.key_note.find_off_key.value() {
             for (j, note_on_key) in note_on_keys.iter().enumerate() {
                 match note_on_key {
                     true => {
-                        match params.key_note.round_up.value() {
+                        match plugin.params.key_note.round_up.value() {
                             true => {
                                 notes_sel[j] = 0;
                                 if j as i8 - i as i8  > -1 && notes_sel[j - i as usize] == 0 {
@@ -217,7 +356,7 @@ impl MidiNote {
                 }
             }
         }
-        match params.key_note.mute_not_find_off_key.value() {
+        match plugin.params.key_note.mute_not_find_off_key.value() {
             true => {
 
             }
@@ -231,10 +370,10 @@ impl MidiNote {
         }
     }
 
-    pub fn param_update(&self, params: &Arc<PluginParams>) {
-        match params.key_note.midi.value() {
-            true => self.update_midi(params),
-            false => self.update(params),
+    pub fn param_update(&self, plugin: &CoPiReMapPlugin) {
+        match plugin.params.key_note.midi.value() {
+            true => self.update_midi(plugin),
+            false => self.update(plugin),
         }
     }
 

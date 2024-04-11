@@ -11,7 +11,7 @@ pub struct MyFilter {
 impl MyFilter {
 
     pub fn set_filter(&mut self, order: u8, filter: FilterType, sample_rate: f32) {
-        self.zpk = butter(order as u32, filter, sample_rate)?;
+        self.zpk = butter(order as u32, filter, sample_rate).unwrap();
     }
 
     pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
@@ -21,8 +21,8 @@ impl MyFilter {
 
 impl Default for MyFilter {
     fn default() -> Self {
-        let zpk = butter(1, FilterType::LowPass(10.0), 44100.0)?;
-        let sos = zpk2sos(&zpk, None)?;
+        let zpk = butter(1, FilterType::LowPass(10.0), 44100.0).unwrap();
+        let sos = zpk2sos(&zpk, None).unwrap();
         let dft2 = [DirectForm2Transposed::new(&sos), DirectForm2Transposed::new(&sos)];
         Self {
             zpk,

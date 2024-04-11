@@ -1,7 +1,7 @@
 use crate::audio_process::AudioProcess;
 
 pub struct Delay {
-    delay_samples: [Vec<f32>; 2],
+    pub delay_samples: [Vec<f32>; 2],
 }
 
 impl Delay {
@@ -22,14 +22,15 @@ impl Delay {
     }
 
     pub fn get_latency(&self) -> u32 {
-        self.delay_samples[0].get(0).unwrap().len()
+        self.delay_samples[0].len() as u32
     }
 
 }
 
 impl Default for Delay {
     fn default() -> Self {
-        let mut delay_samples: [Vec<f32>; 2] = [Vec::new(); 2];
+        const ARRAY_REPEAT_VALUE: Vec<f32> = Vec::new();
+        let mut delay_samples: [Vec<f32>; 2] = [ARRAY_REPEAT_VALUE; 2];
         for _i in 0..1 {
             delay_samples[0].push(0.0);
             delay_samples[1].push(0.0);

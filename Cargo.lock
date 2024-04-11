@@ -6,6 +6,7 @@ version = 3
 name = "CoPiReMap"
 version = "0.0.0"
 dependencies = [
+ "crossbeam",
  "iir_filters",
  "nih_plug",
  "nih_plug_slint",
