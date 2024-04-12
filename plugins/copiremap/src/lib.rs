@@ -423,7 +423,7 @@ impl Plugin for CoPiReMapPlugin {
     {
         self.buffer_config = *buffer_config;
         for (i, audio_process) in self.audio_process.iter_mut().enumerate() {
-            audio_process.setup(&self, (i + 24) as u8);
+            audio_process.setup(&self.params, (i + 24) as u8, &self.buffer_config);
         }
         true
     }
@@ -498,7 +498,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     for ap in self.audio_process.iter_mut() {
-                        ap.set_bpf_center_hz(&self);
+                        ap.set_bpf_center_hz(&self.params, &self.buffer_config);
                     }
                 }
                 if self
@@ -506,7 +506,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    self.fn_update_pitch_shift_and_after_bandpass();
+                    AudioProcess::fn_update_pitch_shift_and_after_bandpass(&self.params, &mut self.audio_process, &self.buffer_config);
                 }
                 if self
                     .update_pitch_shift_over_sampling
@@ -514,7 +514,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     for ap in self.audio_process.iter_mut() {
-                        ap.set_pitch_shift_over_sampling(&self);
+                        ap.set_pitch_shift_over_sampling(&self.params);
                     }
                 }
                 if self
@@ -523,7 +523,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     for ap in self.audio_process.iter_mut() {
-                        ap.set_pitch_shift_window_duration_ms(&self);
+                        ap.set_pitch_shift_window_duration_ms(&self.params, &self.buffer_config);
                     }
                 }
                 if self
@@ -531,7 +531,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    self.midi_note.param_update(&self);
+                    self.midi_note.param_update(&self.params, &mut self.audio_process, &self.buffer_config);
                 }
                 while let Some(event) = context.next_event() {
                     match event {
@@ -563,7 +563,7 @@ impl Plugin for CoPiReMapPlugin {
                         let mut audio_process: [f32; 2] = [0.0; 2];
                         for (i, ap) in self.audio_process.iter_mut().enumerate() {
                             if i >= self.params.global.low_note_off.value() as usize - 24 && i <= self.params.global.high_note_off.value() as usize - 24 {
-                                let af = ap.process(audio, &self);
+                                let af = ap.process(audio, &self.params);
                                 audio_process[0] *= af[0];
                                 audio_process[1] *= af[1];
                             }
@@ -583,20 +583,6 @@ impl Plugin for CoPiReMapPlugin {
         }
         ProcessStatus::Normal
     }
-}
-
-impl CoPiReMapPlugin {
-
-    pub fn fn_update_pitch_shift_and_after_bandpass(&self) {
-        let note_pitch: [i8; 84] = match self.params.key_note.midi.value() {
-            true => {self.params.note_table.im2t.load().i84}
-            false => {self.params.note_table.i2t.load().i84}
-        };
-        for (i, ap) in self.audio_process.iter_mut().enumerate() {
-            ap.set_pitch_shift_and_after_bandpass(&self, note_pitch[i]);
-        }
-    }
-
 }
 
 impl ClapPlugin for CoPiReMapPlugin {

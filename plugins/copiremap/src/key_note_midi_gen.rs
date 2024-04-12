@@ -1,8 +1,10 @@
 use nih_plug::params::{BoolParam, IntParam, Params};
 use nih_plug::prelude::{IntRange};
-use crate::{CoPiReMapPlugin};
+use crate::{CoPiReMapPlugin, PluginParams};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use nih_plug::audio_setup::BufferConfig;
+use crate::audio_process::AudioProcess;
 use crate::note_table::NoteTablesArray;
 
 #[derive(Params)]
@@ -238,43 +240,43 @@ impl Default for MidiNote {
 
 impl MidiNote {
 
-    pub fn update(&self, plugin: &CoPiReMapPlugin) {
-        let mut notes: [i8; 84] = plugin.params.note_table.i2t.load().i84;
-        match plugin.params.key_note.repeat.value() {
+    pub fn update(&self, params: &Arc<PluginParams>, audio_process: &mut [AudioProcess; 84], buffer_config: &BufferConfig) {
+        let mut notes: [i8; 84] = params.note_table.i2t.load().i84;
+        match params.key_note.repeat.value() {
             true => {
                 let mut note_on_keys = [false; 84];
                 let mut notes_sel: [i8; 84] = [-128; 84];
                 for i in 0..84 {
                     let a: u8 = i % 12;
                     match a {
-                        0 => { note_on_keys[i as usize] = plugin.params.key_note.c.value(); }
-                        1 => { note_on_keys[i as usize] = plugin.params.key_note.c_sharp.value(); }
-                        2 => { note_on_keys[i as usize] = plugin.params.key_note.d.value(); }
-                        3 => { note_on_keys[i as usize] = plugin.params.key_note.d_sharp.value(); }
-                        4 => { note_on_keys[i as usize] = plugin.params.key_note.e.value(); }
-                        5 => { note_on_keys[i as usize] = plugin.params.key_note.f.value(); }
-                        6 => { note_on_keys[i as usize] = plugin.params.key_note.f_sharp.value(); }
-                        7 => { note_on_keys[i as usize] = plugin.params.key_note.g.value(); }
-                        8 => { note_on_keys[i as usize] = plugin.params.key_note.g_sharp.value(); }
-                        9 => { note_on_keys[i as usize] = plugin.params.key_note.a.value(); }
-                        10 => { note_on_keys[i as usize] = plugin.params.key_note.a_sharp.value(); }
-                        11 => { note_on_keys[i as usize] = plugin.params.key_note.b.value(); }
+                        0 => { note_on_keys[i as usize] = params.key_note.c.value(); }
+                        1 => { note_on_keys[i as usize] = params.key_note.c_sharp.value(); }
+                        2 => { note_on_keys[i as usize] = params.key_note.d.value(); }
+                        3 => { note_on_keys[i as usize] = params.key_note.d_sharp.value(); }
+                        4 => { note_on_keys[i as usize] = params.key_note.e.value(); }
+                        5 => { note_on_keys[i as usize] = params.key_note.f.value(); }
+                        6 => { note_on_keys[i as usize] = params.key_note.f_sharp.value(); }
+                        7 => { note_on_keys[i as usize] = params.key_note.g.value(); }
+                        8 => { note_on_keys[i as usize] = params.key_note.g_sharp.value(); }
+                        9 => { note_on_keys[i as usize] = params.key_note.a.value(); }
+                        10 => { note_on_keys[i as usize] = params.key_note.a_sharp.value(); }
+                        11 => { note_on_keys[i as usize] = params.key_note.b.value(); }
                         _ => {}
                     }
                 }
-                self.find_off_key(plugin, &note_on_keys, &mut notes_sel);
+                self.find_off_key(params, &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
             false => {
             }
         }
-        plugin.params.note_table.i2t.store(NoteTablesArray { i84: notes});
-        plugin.fn_update_pitch_shift_and_after_bandpass();
+        params.note_table.i2t.store(NoteTablesArray { i84: notes});
+        AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config);
     }
 
-    pub fn update_midi(&self, plugin: &CoPiReMapPlugin) {
-        let mut notes: [i8; 84] = plugin.params.note_table.im2t.load().i84;
-        match plugin.params.key_note.repeat.value() {
+    pub fn update_midi(&self, params: &Arc<PluginParams>, audio_process: &mut [AudioProcess; 84], buffer_config: &BufferConfig) {
+        let mut notes: [i8; 84] = params.note_table.im2t.load().i84;
+        match params.key_note.repeat.value() {
             true => {
                 let mut note_on_keys = [false; 84];
                 let mut note_keys = [false; 12];
@@ -304,25 +306,25 @@ impl MidiNote {
                         _ => {}
                     }
                 }
-                self.find_off_key(plugin, &note_on_keys, &mut notes_sel);
+                self.find_off_key(params, &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
             false => {
                 let mut notes_sel: [i8; 84] = [-128; 84];
-                self.find_off_key(plugin, &self.note, &mut notes_sel);
+                self.find_off_key(params, &self.note, &mut notes_sel);
                 notes = notes_sel;
             }
         }
-        plugin.params.note_table.im2t.store(NoteTablesArray { i84: notes});
-        plugin.fn_update_pitch_shift_and_after_bandpass();
+        params.note_table.im2t.store(NoteTablesArray { i84: notes});
+        AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config);
     }
 
-    fn find_off_key(&self, plugin: &CoPiReMapPlugin, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
-        for i in 0..plugin.params.key_note.find_off_key.value() {
+    fn find_off_key(&self, params: &Arc<PluginParams>, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
+        for i in 0..params.key_note.find_off_key.value() {
             for (j, note_on_key) in note_on_keys.iter().enumerate() {
                 match note_on_key {
                     true => {
-                        match plugin.params.key_note.round_up.value() {
+                        match params.key_note.round_up.value() {
                             true => {
                                 notes_sel[j] = 0;
                                 if j as i8 - i as i8  > -1 && notes_sel[j - i as usize] == 0 {
@@ -356,7 +358,7 @@ impl MidiNote {
                 }
             }
         }
-        match plugin.params.key_note.mute_not_find_off_key.value() {
+        match params.key_note.mute_not_find_off_key.value() {
             true => {
 
             }
@@ -370,10 +372,10 @@ impl MidiNote {
         }
     }
 
-    pub fn param_update(&self, plugin: &CoPiReMapPlugin) {
-        match plugin.params.key_note.midi.value() {
-            true => self.update_midi(plugin),
-            false => self.update(plugin),
+    pub fn param_update(&self, params: &Arc<PluginParams>, audio_process: &mut [AudioProcess; 84], buffer_config: &BufferConfig) {
+        match params.key_note.midi.value() {
+            true => self.update_midi(params, audio_process, buffer_config),
+            false => self.update(params, audio_process, buffer_config),
         }
     }
 
