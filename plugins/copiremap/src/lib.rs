@@ -484,7 +484,7 @@ impl Plugin for CoPiReMapPlugin {
                     self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate)
                 }
                 if self
-                    .update_lowpass
+                    .update_highpass
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
