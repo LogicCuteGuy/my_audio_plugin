@@ -1,6 +1,6 @@
 use nih_plug::params::{BoolParam, IntParam, Params};
 use nih_plug::prelude::{IntRange};
-use crate::{CoPiReMapPlugin, PluginParams};
+use crate::{PluginParams};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use nih_plug::audio_setup::BufferConfig;
