@@ -12,10 +12,12 @@ impl MyFilter {
 
     pub fn set_filter(&mut self, order: u8, filter: FilterType, sample_rate: f32) {
         self.zpk = butter(order as u32, filter, sample_rate).unwrap();
+        self.sos = zpk2sos(&self.zpk, None).unwrap();
+        self.dft2 = [DirectForm2Transposed::new(&self.sos), DirectForm2Transposed::new(&self.sos)];
     }
 
-    pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
-        [self.dft2[0].filter(input[0]), self.dft2[1].filter(input[1])]
+    pub fn process(&mut self, input: f32, audio_id: usize) -> f32 {
+        self.dft2[audio_id].filter(input)
     }
 }
 

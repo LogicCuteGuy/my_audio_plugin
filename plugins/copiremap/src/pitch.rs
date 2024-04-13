@@ -34,8 +34,8 @@ impl MyPitch {
         self.pitch[1].reset();
     }
 
-    pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
-        [self.pitch[0].process(input[0]), self.pitch[1].process(input[1])]
+    pub fn process(&mut self, input: f32, audio_id: usize) -> f32 {
+        self.pitch[audio_id].process(input)
     }
 
 }

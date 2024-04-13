@@ -11,14 +11,16 @@ impl Delay {
         self.delay_samples[1].resize(delay as usize, 0.0);
     }
 
-    pub fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
-        self.delay_samples[0].push(input[0]);
-        self.delay_samples[1].push(input[1]);
-        let out = self.delay_samples[0].get(0).unwrap().clone();
-        let out1 = self.delay_samples[1].get(0).unwrap().clone();
-        self.delay_samples[0].remove(0);
-        self.delay_samples[1].remove(0);
-        [out, out1]
+    pub fn reset(&mut self) {
+        self.delay_samples[0].fill(0.0);
+        self.delay_samples[1].fill(0.0);
+    }
+
+    pub fn process(&mut self, input: f32, audio_id: usize) -> f32 {
+        self.delay_samples[audio_id].push(input);
+        let out = self.delay_samples[audio_id].get(0).unwrap().clone();
+        self.delay_samples[audio_id].remove(0);
+        out
     }
 
     pub fn get_latency(&self) -> u32 {
@@ -41,6 +43,6 @@ impl Default for Delay {
     }
 }
 
-pub fn latency_average(ap: &[AudioProcess; 84]) -> u32 {
+pub fn latency_average(ap: &Vec<AudioProcess>) -> u32 {
     ap[0].get_latency()
 }

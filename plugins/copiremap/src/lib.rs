@@ -250,8 +250,8 @@ impl PluginComponent {
 
     fn set_parameter(&self, id: &str, parameter: PluginParameter) {
         match id {
-            "gain" => self.component.set_gain(parameter),
-            _ => unimplemented!(),
+            "bypass" => self.component.set_gain(parameter),
+            _ => (),
         }
     }
 }
@@ -328,7 +328,7 @@ pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
     buffer_config: BufferConfig,
     midi_note: MidiNote,
-    audio_process: [AudioProcess; 84],
+    audio_process: Vec<AudioProcess>,
     lpf: MyFilter,
     hpf: MyFilter,
     delay: Delay,
@@ -355,8 +355,10 @@ impl Default for CoPiReMapPlugin {
         let update_bpf_center_hz = Arc::new(AtomicBool::new(false));
 
         let update_key_note = Arc::new(AtomicBool::new(false));
-
-        let audio_process = core::array::from_fn(|_| AudioProcess::default());
+        let mut audio_process = Vec::with_capacity(84);
+        for _ in 0..84 {
+            audio_process.push(AudioProcess::default());
+        }
         Self {
             params: Arc::new(PluginParams {
                 note_table: Arc::new(NoteTables::default()),
@@ -423,7 +425,7 @@ impl Plugin for CoPiReMapPlugin {
     {
         self.buffer_config = *buffer_config;
         for (i, audio_process) in self.audio_process.iter_mut().enumerate() {
-            audio_process.setup(&self.params, (i + 24) as u8, &self.buffer_config);
+            audio_process.setup(self.params.clone(), (i + 24) as u8, &self.buffer_config);
         }
         true
     }
@@ -498,7 +500,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     for ap in self.audio_process.iter_mut() {
-                        ap.set_bpf_center_hz(&self.params, &self.buffer_config);
+                        ap.set_bpf_center_hz(self.params.clone(), &self.buffer_config);
                     }
                 }
                 if self
@@ -506,7 +508,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    AudioProcess::fn_update_pitch_shift_and_after_bandpass(&self.params, &mut self.audio_process, &self.buffer_config);
+                    AudioProcess::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process, &self.buffer_config);
                 }
                 if self
                     .update_pitch_shift_over_sampling
@@ -514,7 +516,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     for ap in self.audio_process.iter_mut() {
-                        ap.set_pitch_shift_over_sampling(&self.params);
+                        ap.set_pitch_shift_over_sampling(self.params.clone());
                     }
                 }
                 if self
@@ -523,7 +525,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     for ap in self.audio_process.iter_mut() {
-                        ap.set_pitch_shift_window_duration_ms(&self.params, &self.buffer_config);
+                        ap.set_pitch_shift_window_duration_ms(self.params.clone(), &self.buffer_config);
                     }
                 }
                 if self
@@ -531,7 +533,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    self.midi_note.param_update(&self.params, &mut self.audio_process, &self.buffer_config);
+                    self.midi_note.param_update(self.params.clone(), &mut self.audio_process, &self.buffer_config);
                 }
                 while let Some(event) = context.next_event() {
                     match event {
@@ -552,32 +554,28 @@ impl Plugin for CoPiReMapPlugin {
                         _ => (),
                     }
                 }
-                for channel in buffer.as_slice() {
-                    let mut audio: [f32; 2] = [*channel.get(0).unwrap(), *channel.get(1).unwrap()];
-                    let delay = self.delay.process(audio);
-                    let lpf = self.lpf.process(delay);
-                    let hpf = self.hpf.process(delay);
-                    let lpf_mute = match self.params.global.low_note_off_mute.value() { true => [0.0, 0.0], false => lpf };
-                    let hpf_mute = match self.params.global.high_note_off_mute.value() { true => [0.0, 0.0], false => hpf };
-                    if audio[0] >= self.params.global.global_threshold.value() || audio[1] >= self.params.global.global_threshold.value() {
-                        let mut audio_process: [f32; 2] = [0.0; 2];
-                        for (i, ap) in self.audio_process.iter_mut().enumerate() {
-                            if i >= self.params.global.low_note_off.value() as usize - 24 && i <= self.params.global.high_note_off.value() as usize - 24 {
-                                let af = ap.process(audio, &self.params);
-                                audio_process[0] *= af[0];
-                                audio_process[1] *= af[1];
+                for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
+                    for sample in channel.iter_mut() {
+                        let mut audio: f32 = *sample;
+                        let delay = self.delay.process(audio, i);
+                        let lpf = self.lpf.process(delay, i);
+                        let hpf = self.hpf.process(delay, i);
+                        let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => lpf };
+                        let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => hpf };
+                        if audio >= self.params.global.global_threshold.value() || true {
+                            let mut audio_process: f32 = 0.0;
+                            for (ii, ap) in self.audio_process.iter_mut().enumerate() {
+                                if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
+                                    audio_process += ap.process(audio, self.params.clone(), i);
+                                }
                             }
+                            audio_process *= self.params.global.wet_gain.value();
+                            audio = audio_process + lpf_mute + hpf_mute;
+                        } else {
+                            audio = delay + lpf_mute + hpf_mute;
                         }
-                        audio_process[0] *= self.params.global.wet_gain.value();
-                        audio_process[1] *= self.params.global.wet_gain.value();
-                        audio[0] = audio_process[0] + lpf_mute[0] + hpf_mute[0];
-                        audio[1] = audio_process[1] + lpf_mute[1] + hpf_mute[1];
-                    } else {
-                        audio[0] = delay[0] + lpf_mute[0] + hpf_mute[0];
-                        audio[1] = delay[1] + lpf_mute[1] + hpf_mute[1];
+                        *sample = audio;
                     }
-                    *channel.get_mut(0).unwrap() = audio[0];
-                    *channel.get_mut(1).unwrap() = audio[1];
                 }
             }
         }

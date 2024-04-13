@@ -240,7 +240,7 @@ impl Default for MidiNote {
 
 impl MidiNote {
 
-    pub fn update(&self, params: &Arc<PluginParams>, audio_process: &mut [AudioProcess; 84], buffer_config: &BufferConfig) {
+    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig) {
         let mut notes: [i8; 84] = params.note_table.i2t.load().i84;
         match params.key_note.repeat.value() {
             true => {
@@ -264,7 +264,7 @@ impl MidiNote {
                         _ => {}
                     }
                 }
-                self.find_off_key(params, &note_on_keys, &mut notes_sel);
+                self.find_off_key(params.clone(), &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
             false => {
@@ -274,7 +274,7 @@ impl MidiNote {
         AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config);
     }
 
-    pub fn update_midi(&self, params: &Arc<PluginParams>, audio_process: &mut [AudioProcess; 84], buffer_config: &BufferConfig) {
+    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig) {
         let mut notes: [i8; 84] = params.note_table.im2t.load().i84;
         match params.key_note.repeat.value() {
             true => {
@@ -306,12 +306,12 @@ impl MidiNote {
                         _ => {}
                     }
                 }
-                self.find_off_key(params, &note_on_keys, &mut notes_sel);
+                self.find_off_key(params.clone(), &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
             false => {
                 let mut notes_sel: [i8; 84] = [-128; 84];
-                self.find_off_key(params, &self.note, &mut notes_sel);
+                self.find_off_key(params.clone(), &self.note, &mut notes_sel);
                 notes = notes_sel;
             }
         }
@@ -319,7 +319,7 @@ impl MidiNote {
         AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config);
     }
 
-    fn find_off_key(&self, params: &Arc<PluginParams>, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
+    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
         for i in 0..params.key_note.find_off_key.value() {
             for (j, note_on_key) in note_on_keys.iter().enumerate() {
                 match note_on_key {
@@ -372,7 +372,7 @@ impl MidiNote {
         }
     }
 
-    pub fn param_update(&self, params: &Arc<PluginParams>, audio_process: &mut [AudioProcess; 84], buffer_config: &BufferConfig) {
+    pub fn param_update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig) {
         match params.key_note.midi.value() {
             true => self.update_midi(params, audio_process, buffer_config),
             false => self.update(params, audio_process, buffer_config),
