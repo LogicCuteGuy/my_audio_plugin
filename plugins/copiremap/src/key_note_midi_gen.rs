@@ -18,9 +18,6 @@ pub struct KeyNoteParams {
     #[id = "find_off_key"]
     pub find_off_key: IntParam,
 
-    #[id = "mute_not_find_off_key"]
-    pub mute_not_find_off_key: BoolParam,
-
     #[id = "round_up"]
     pub round_up: BoolParam,
 
@@ -74,7 +71,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            repeat: BoolParam::new("Repeat", false)
+            repeat: BoolParam::new("Repeat", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -83,16 +80,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            find_off_key: IntParam::new("Find Off Key", 1, IntRange::Linear{ min: 0, max: 48 })
-                .with_callback(
-                {
-                    let update_key_note = update_key_note.clone();
-                    Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
-                    })
-                }
-            ),
-            mute_not_find_off_key: BoolParam::new("Mute Not Find Off Key", false)
+            find_off_key: IntParam::new("Find Off Key", 4, IntRange::Linear{ min: 0, max: 48 })
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -128,7 +116,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            d: BoolParam::new("D", false)
+            d: BoolParam::new("D", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -146,7 +134,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            e: BoolParam::new("E", false)
+            e: BoolParam::new("E", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -164,7 +152,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            f_sharp: BoolParam::new("F#", false)
+            f_sharp: BoolParam::new("F#", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -173,7 +161,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            g: BoolParam::new("G", false)
+            g: BoolParam::new("G", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -191,7 +179,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            a: BoolParam::new("A", false)
+            a: BoolParam::new("A", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -209,7 +197,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            b: BoolParam::new("B", false)
+            b: BoolParam::new("B", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -271,7 +259,7 @@ impl MidiNote {
             }
         }
         params.note_table.i2t.store(NoteTablesArray { i84: notes});
-        AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config);
+        AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
     pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig) {
@@ -316,56 +304,50 @@ impl MidiNote {
             }
         }
         params.note_table.im2t.store(NoteTablesArray { i84: notes});
-        AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config);
+        AudioProcess::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
     fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 84], notes_sel: &mut [i8; 84]) {
         for i in 0..params.key_note.find_off_key.value() {
-            for (j, note_on_key) in note_on_keys.iter().enumerate() {
-                match note_on_key {
-                    true => {
-                        match params.key_note.round_up.value() {
+            match params.key_note.round_up.value() {
+                true => {
+                    for (j, note_on_key) in note_on_keys.iter().enumerate() {
+                        match note_on_key {
                             true => {
                                 notes_sel[j] = 0;
-                                if j as i8 - i as i8  > -1 && notes_sel[j - i as usize] == 0 {
-
+                                if j as i8 - i as i8 > -1 && notes_sel[j - i as usize] == -128 {
                                     notes_sel[j - i as usize] = 0;
                                     notes_sel[j - i as usize] = i as i8;
                                 }
-                                if j + i as usize <= 83 && notes_sel[j + i as usize] == 0 {
+                                if j + i as usize <= 83 && notes_sel[j + i as usize] == -128 {
                                     notes_sel[j + i as usize] = 0;
                                     notes_sel[j + i as usize] = (i * -1) as i8;
                                 }
                             }
                             false => {
-                                let ii = 83 - i;
-                                notes_sel[j] = 0;
-                                if j as i8 - ii as i8 > -1 && notes_sel[j - ii as usize] == 0 {
-                                    notes_sel[j - ii as usize] = 0;
-                                    notes_sel[j - ii as usize] = ii as i8;
-                                }
-                                if j + ii as usize <= 83 && notes_sel[j + ii as usize] == 0 {
-                                    notes_sel[j + ii as usize] = 0;
-                                    notes_sel[j + ii as usize] = (ii * -1) as i8;
-                                }
+
                             }
                         }
-
-                    }
-                    false => {
-
                     }
                 }
-            }
-        }
-        match params.key_note.mute_not_find_off_key.value() {
-            true => {
+                false => {
+                    for (j, note_on_key) in note_on_keys.iter().enumerate().rev() {
+                        match note_on_key {
+                            true => {
+                                notes_sel[j] = 0;
+                                if j as i8 - i as i8 > -1 && notes_sel[j - i as usize] == -128 {
+                                    notes_sel[j - i as usize] = 0;
+                                    notes_sel[j - i as usize] = i as i8;
+                                }
+                                if j + i as usize <= 83 && notes_sel[j + i as usize] == -128 {
+                                    notes_sel[j + i as usize] = 0;
+                                    notes_sel[j + i as usize] = (i * -1) as i8;
+                                }
+                            }
+                            false => {
 
-            }
-            false => {
-                for i in 0..84 {
-                    if notes_sel[i] == -128 {
-                        notes_sel[i] = 0;
+                            }
+                        }
                     }
                 }
             }

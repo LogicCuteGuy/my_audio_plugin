@@ -78,7 +78,7 @@ impl AudioProcessParams {
                 "Order After Pitch Shift Bandpass",
                 5,
                 IntRange::Linear {
-                    min: 0,
+                    min: 1,
                     max: 15,
                 }
             ).with_callback(
@@ -92,8 +92,8 @@ impl AudioProcessParams {
                 "In Key Gain",
                 0.0,
                 FloatRange::Skewed {
-                    min: db_to_gain(-20.0),
-                    max: db_to_gain(6.0),
+                    min: db_to_gain(-48.0),
+                    max: db_to_gain(12.0),
                     factor: FloatRange::gain_skew_factor(-20.0, 6.0),
                 }
             ).with_unit(" dB")
@@ -103,15 +103,15 @@ impl AudioProcessParams {
                 "Off Key Gain",
                 db_to_gain(0.0),
                 FloatRange::Skewed {
-                    min: db_to_gain(-20.0),
-                    max: db_to_gain(6.0),
+                    min: db_to_gain(-48.0),
+                    max: db_to_gain(12.0),
                     factor: FloatRange::gain_skew_factor(-20.0, 6.0),
                 }
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             pitch_shift_window_duration_ms: IntParam::new(
-                "Order After Pitch Shift Bandpass",
+                "Pitch Shift Window Duration",
                 2,
                 IntRange::Linear {
                     min: 1,
@@ -137,6 +137,7 @@ pub struct AudioProcess {
     note: u8,
     center_hz: f32,
     tuning_hz: f32,
+    note_pitch: i8
 }
 
 impl AudioProcess {
@@ -163,6 +164,7 @@ impl AudioProcess {
         let mut lowpass: f32 = 0.0;
         let mut highpass: f32 = 0.0;
         let note_pitch: i8 = params.note_table.i2t.load().i84[(note - 24) as usize];
+        self.note_pitch = note_pitch;
         hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut lowpass, &mut highpass, params.global.hz_center.value(), params.global.hz_tuning.value());
         self.tuning_hz = pitch_tune_hz.clone();
         self.tuning.set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz);
@@ -174,6 +176,7 @@ impl AudioProcess {
         let mut lowpass: f32 = 0.0;
         let mut highpass: f32 = 0.0;
         let mut pitch_tune_hz: f32 = 0.0;
+        self.note_pitch = note_pitch;
         hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut lowpass, &mut highpass, params.global.hz_center.value(), params.global.hz_tuning.value());
         self.tuning_hz = pitch_tune_hz.clone();
         self.tuning.set_pitch(pitch_tune_hz);
@@ -207,21 +210,17 @@ impl AudioProcess {
             true => self.after_tune_bpf.process(pitch, audio_id),
             false => pitch
         };
-        let note_pitch: i8 = params.note_table.i2t.load().i84[(self.note - 24) as usize];
         let mut output: f32 = 0.0;
-        output = if note_pitch == 0 { after_tune_bpf * params.audio_process.in_key_gain.value() } else { after_tune_bpf * params.audio_process.off_key_gain.value()};
-        output = if note_pitch == -128 { 0.0 } else { output };
-        bpf
+        output = if self.note_pitch == 0 { after_tune_bpf * params.audio_process.in_key_gain.value() } else { after_tune_bpf * params.audio_process.off_key_gain.value()};
+        output = if self.note_pitch == -128 { 0.0 } else { output };
+        output
     }
 
-    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig) {
-        let note_pitch: [i8; 84] = match params.key_note.midi.value() {
-            true => {params.note_table.im2t.load().i84}
-            false => {params.note_table.i2t.load().i84}
-        };
+    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig, note_pitch: [i8; 84]) {
         for (i, ap) in audio_process.iter_mut().enumerate() {
             ap.set_pitch_shift_and_after_bandpass(params.clone(), note_pitch[i], &buffer_config);
         }
+        println!("Doing {:?}", note_pitch)
     }
 }
 
@@ -235,6 +234,7 @@ impl Default for AudioProcess {
             note: 0,
             center_hz: 0.0,
             tuning_hz: 0.0,
+            note_pitch: 0,
         }
     }
 

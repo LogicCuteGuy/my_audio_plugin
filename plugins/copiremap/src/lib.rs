@@ -146,7 +146,7 @@ impl GlobalParams {
                 "Order",
                 5,
                 IntRange::Linear {
-                    min: 0,
+                    min: 1,
                     max: 15,
                 },
             ).with_callback(
@@ -433,6 +433,7 @@ impl Plugin for CoPiReMapPlugin {
         for (i, audio_process) in self.audio_process.iter_mut().enumerate() {
             audio_process.setup(self.params.clone(), (i + 24) as u8, &self.buffer_config);
         }
+        self.midi_note.param_update(self.params.clone(), &mut self.audio_process, &self.buffer_config);
         true
     }
 
@@ -514,7 +515,11 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    AudioProcess::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process, &self.buffer_config);
+                    let note_table = match self.params.key_note.midi.value() {
+                        true => self.params.note_table.im2t.load().i84,
+                        false => self.params.note_table.i2t.load().i84,
+                    };
+                    AudioProcess::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process, &self.buffer_config, note_table);
                 }
                 if self
                     .update_pitch_shift_over_sampling
@@ -549,14 +554,26 @@ impl Plugin for CoPiReMapPlugin {
                             channel,
                             note,
                             velocity,
-                        } => if note >= 24 || note < 108 { self.midi_note.note[note as usize - 24] = true },
+                        } => if note >= 24 || note < 108 {
+                            self.midi_note.note[note as usize - 24] = true;
+                            match self.params.key_note.midi.value() {
+                                true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process, &self.buffer_config),
+                                false => {},
+                            }
+                        },
                         NoteEvent::NoteOff {
                             timing,
                             voice_id,
                             channel,
                             note,
                             velocity,
-                        } => if note >= 24 || note < 108 { self.midi_note.note[note as usize - 24] = false },
+                        } => if note >= 24 || note < 108 {
+                            self.midi_note.note[note as usize - 24] = false;
+                            match self.params.key_note.midi.value() {
+                                true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process, &self.buffer_config),
+                                false => {},
+                            }
+                        },
                         _ => (),
                     }
                 }
