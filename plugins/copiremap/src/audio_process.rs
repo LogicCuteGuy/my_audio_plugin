@@ -202,7 +202,7 @@ impl AudioProcess {
     pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize) -> f32 {
         let bpf: f32 = self.bpf.process(input, audio_id);
         let threshold: bool = bpf >= params.audio_process.threshold.value();
-        let pitch: f32 = match params.audio_process.pitch_shift.value() && true {
+        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) {
             true => self.tuning.process(bpf, audio_id),
             false => self.delay.process(bpf, audio_id)
         };
