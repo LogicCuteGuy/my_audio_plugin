@@ -424,6 +424,12 @@ impl Plugin for CoPiReMapPlugin {
     ) -> bool
     {
         self.buffer_config = *buffer_config;
+        let mut lowpass: f32 = 0.0;
+        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut lowpass, &mut 0.0, self.params.global.hz_tuning.value());
+        self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate);
+        let mut highpass: f32 = 0.0;
+        hz_cal_clh(self.params.global.high_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
+        self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate);
         for (i, audio_process) in self.audio_process.iter_mut().enumerate() {
             audio_process.setup(self.params.clone(), (i + 24) as u8, &self.buffer_config);
         }
@@ -483,7 +489,7 @@ impl Plugin for CoPiReMapPlugin {
                 {
                     let mut lowpass: f32 = 0.0;
                     hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut lowpass, &mut 0.0, self.params.global.hz_tuning.value());
-                    self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate)
+                    self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate);
                 }
                 if self
                     .update_highpass
@@ -491,8 +497,8 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     let mut highpass: f32 = 0.0;
-                    hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
-                    self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate)
+                    hz_cal_clh(self.params.global.high_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
+                    self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate);
                 }
                 if self
                     .update_bpf_center_hz

@@ -54,7 +54,7 @@ impl AudioProcessParams {
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             pitch_shift: BoolParam::new(
                 "Pitch Shift",
-                false,
+                true,
             ),
             pitch_shift_over_sampling: IntParam::new(
                 "Pitch Shift Over Sampling",
@@ -158,13 +158,14 @@ impl AudioProcess {
         let mut highpass: f32 = 0.0;
         hz_cal_clh(note, &mut self.center_hz, &mut lowpass, &mut highpass, params.global.hz_center.value());
         self.bpf.set_filter(params.global.order.value() as u8, FilterType::BandPass(lowpass, highpass), buffer_config.sample_rate);
+        // println!("{}, {}", lowpass, highpass);
         let mut pitch_tune_hz: f32 = 0.0;
         let mut lowpass: f32 = 0.0;
         let mut highpass: f32 = 0.0;
         let note_pitch: i8 = params.note_table.i2t.load().i84[(note - 24) as usize];
         hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut lowpass, &mut highpass, params.global.hz_center.value(), params.global.hz_tuning.value());
         self.tuning_hz = pitch_tune_hz.clone();
-        self.tuning.set_pitch(pitch_tune_hz);
+        self.tuning.set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz);
         self.after_tune_bpf.set_filter(params.audio_process.order_after_pitch_shift_bandpass.value() as u8, FilterType::BandPass(lowpass, highpass), buffer_config.sample_rate);
         self.note = note;
     }
@@ -210,7 +211,7 @@ impl AudioProcess {
         let mut output: f32 = 0.0;
         output = if note_pitch == 0 { after_tune_bpf * params.audio_process.in_key_gain.value() } else { after_tune_bpf * params.audio_process.off_key_gain.value()};
         output = if note_pitch == -128 { 0.0 } else { output };
-        output
+        bpf
     }
 
     pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig) {

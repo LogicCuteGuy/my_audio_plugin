@@ -49,7 +49,7 @@ impl Filter for DirectForm2Transposed {
 
         for (i, section) in self.sos.sections.iter().enumerate() {
             let prev_output = output;
-            output = section.b0 * prev_output + self.s1[i] ;
+            output = section.b0 * prev_output + self.s1[i];
             self.s1[i] =  section.b1 * prev_output - section.a1 * output + self.s2[i];
             self.s2[i] = section.b2 * prev_output - section.a2 * output;
         }
