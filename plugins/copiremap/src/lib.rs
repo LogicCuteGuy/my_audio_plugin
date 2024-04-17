@@ -20,7 +20,8 @@ use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
 use iir_filters::filter_design::FilterType;
-use crate::audio_process::{AudioProcess, AudioProcessParams};
+use simple_eq::design::Curve;
+use crate::audio_process::{AudioProcess96, AudioProcessParams};
 use crate::delay::{Delay, latency_average};
 use crate::filter::MyFilter;
 use crate::hertz_calculator::hz_cal_clh;
@@ -69,9 +70,6 @@ pub struct GlobalParams {
 
     #[id = "high_note_off_mute"]
     pub high_note_off_mute: BoolParam,
-
-    #[id = "order"]
-    pub order: IntParam,
 
     #[id = "hz_center"]
     pub hz_center: FloatParam,
@@ -141,25 +139,6 @@ impl GlobalParams {
             high_note_off_mute: BoolParam::new(
                 "High Note Off Mute",
                 false,
-            ),
-            order: IntParam::new(
-                "Order",
-                5,
-                IntRange::Linear {
-                    min: 1,
-                    max: 15,
-                },
-            ).with_callback(
-                {
-                    let update_lowpass = update_lowpass.clone();
-                    let update_highpass = update_highpass.clone();
-                    let update_bpf_center_hz = update_bpf_center_hz.clone();
-                    Arc::new(move |_| {
-                        update_lowpass.store(true, Ordering::Release);
-                        update_highpass.store(true, Ordering::Release);
-                        update_bpf_center_hz.store(true, Ordering::Release);
-                    })
-                }
             ),
             hz_center: FloatParam::new("Hz Center", 440.0, FloatRange::Linear{ min: 415.3046976, max: 466.1637615 })
                 .with_value_to_string(formatters::v2s_f32_hz_then_khz(2))
@@ -328,7 +307,7 @@ pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
     buffer_config: BufferConfig,
     midi_note: MidiNote,
-    audio_process: Vec<AudioProcess>,
+    audio_process: [AudioProcess96; 96],
     lpf: MyFilter,
     hpf: MyFilter,
     delay: Delay,
@@ -355,10 +334,6 @@ impl Default for CoPiReMapPlugin {
         let update_bpf_center_hz = Arc::new(AtomicBool::new(false));
 
         let update_key_note = Arc::new(AtomicBool::new(false));
-        let mut audio_process = Vec::with_capacity(84);
-        for _ in 0..84 {
-            audio_process.push(AudioProcess::default());
-        }
         Self {
             params: Arc::new(PluginParams {
                 note_table: Arc::new(NoteTables::default()),
@@ -373,7 +348,7 @@ impl Default for CoPiReMapPlugin {
                 process_mode: ProcessMode::Realtime,
             },
             midi_note: MidiNote::default(),
-            audio_process,
+            audio_process: [AudioProcess96::default(); 96],
             lpf: MyFilter::default(),
             hpf: MyFilter::default(),
             delay: Delay::default(),
@@ -425,8 +400,8 @@ impl Plugin for CoPiReMapPlugin {
     {
         self.buffer_config = *buffer_config;
         let mut lowpass: f32 = 0.0;
-        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut 0.0, &mut lowpass, &mut 0.0, self.params.global.hz_tuning.value());
-        self.lpf.set_filter(self.params.global.order.value() as u8, FilterType::LowPass(lowpass), self.buffer_config.sample_rate);
+        hz_cal_clh(self.params.global.low_note_off.value() as u8, &mut lowpass, self.params.global.hz_tuning.value());
+        self.lpf.set(Curve::Lowpass, lowpass);
         let mut highpass: f32 = 0.0;
         hz_cal_clh(self.params.global.high_note_off.value() as u8, &mut 0.0, &mut 0.0, &mut highpass, self.params.global.hz_tuning.value());
         self.hpf.set_filter(self.params.global.order.value() as u8, FilterType::HighPass(highpass), self.buffer_config.sample_rate);
@@ -519,7 +494,7 @@ impl Plugin for CoPiReMapPlugin {
                         true => self.params.note_table.im2t.load().i84,
                         false => self.params.note_table.i2t.load().i84,
                     };
-                    AudioProcess::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process, &self.buffer_config, note_table);
+                    AudioProcess96::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process, &self.buffer_config, note_table);
                 }
                 if self
                     .update_pitch_shift_over_sampling
@@ -554,7 +529,7 @@ impl Plugin for CoPiReMapPlugin {
                             channel,
                             note,
                             velocity,
-                        } => if note >= 24 || note < 108 {
+                        } => if note >= 24 || note < 120 {
                             self.midi_note.note[note as usize - 24] = true;
                             match self.params.key_note.midi.value() {
                                 true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process, &self.buffer_config),
@@ -567,7 +542,7 @@ impl Plugin for CoPiReMapPlugin {
                             channel,
                             note,
                             velocity,
-                        } => if note >= 24 || note < 108 {
+                        } => if note >= 24 || note < 120 {
                             self.midi_note.note[note as usize - 24] = false;
                             match self.params.key_note.midi.value() {
                                 true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process, &self.buffer_config),

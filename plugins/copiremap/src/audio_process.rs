@@ -26,9 +26,6 @@ pub struct AudioProcessParams {
     #[id = "after_pitch_shift_bandpass"]
     pub after_pitch_shift_bandpass: BoolParam,
 
-    #[id = "order_after_pitch_shift_bandpass"]
-    pub order_after_pitch_shift_bandpass: IntParam,
-
     #[id = "in_key_gain"]
     pub in_key_gain: FloatParam,
 
@@ -74,20 +71,6 @@ impl AudioProcessParams {
                 "After Pitch Shift Bandpass",
                 false,
             ),
-            order_after_pitch_shift_bandpass: IntParam::new(
-                "Order After Pitch Shift Bandpass",
-                5,
-                IntRange::Linear {
-                    min: 1,
-                    max: 15,
-                }
-            ).with_callback(
-                {
-                    Arc::new(move |_| {
-                        update_pitch_shift_and_after_bandpass.store(true, Ordering::Release);
-                    })
-                }
-            ),
             in_key_gain: FloatParam::new(
                 "In Key Gain",
                 0.0,
@@ -129,7 +112,7 @@ impl AudioProcessParams {
     }
 }
 
-pub struct AudioProcess {
+pub struct AudioProcess96 {
     bpf: MyFilter,
     tuning: MyPitch,
     after_tune_bpf: MyFilter,
@@ -140,7 +123,7 @@ pub struct AudioProcess {
     note_pitch: i8
 }
 
-impl AudioProcess {
+impl AudioProcess96 {
     pub fn reset(&mut self) {
         self.tuning.reset();
         self.delay.reset();
@@ -215,7 +198,7 @@ impl AudioProcess {
         after_tune_bpf
     }
 
-    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig, note_pitch: [i8; 84]) {
+    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut [AudioProcess96; 96], buffer_config: &BufferConfig, note_pitch: [i8; 84]) {
         for (i, ap) in audio_process.iter_mut().enumerate() {
             ap.set_pitch_shift_and_after_bandpass(params.clone(), note_pitch[i], &buffer_config);
         }
@@ -223,7 +206,7 @@ impl AudioProcess {
     }
 }
 
-impl Default for AudioProcess {
+impl Default for AudioProcess96 {
     fn default() -> Self {
         Self {
             bpf: MyFilter::default(),

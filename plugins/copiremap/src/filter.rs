@@ -1,35 +1,58 @@
-use iir_filters::filter::{DirectForm2Transposed, Filter};
-use iir_filters::filter_design::{butter, FilterType, ZPKCoeffs};
-use iir_filters::sos::{Sos, zpk2sos};
+use simple_eq::design::{Curve, Design, normalize_frequency};
+use simple_eq::filter::Filter;
 
 pub struct MyFilter {
-    zpk: ZPKCoeffs,
-    sos: Sos,
-    dft2: [DirectForm2Transposed; 2],
+    filter: [Filter<f32>; 2],
 }
 
 impl MyFilter {
+    pub fn set(&mut self, curve: Curve, frequency: f32, resonance: f32, gain: f32, sample_rate: f32) {
+        self.filter[0].set(curve, frequency, resonance, gain, sample_rate);
+        self.filter[1].set(curve, frequency, resonance, gain, sample_rate);
+    }
+    pub fn get_design(&self) -> [Design<f32>; 2] {
+        [self.filter[0].get_design(), self.filter[1].get_design()]
+    }
 
-    pub fn set_filter(&mut self, order: u8, filter: FilterType, sample_rate: f32) {
-        self.zpk = butter(order as u32, filter, sample_rate).unwrap();
-        self.sos = zpk2sos(&self.zpk, None).unwrap();
-        self.dft2 = [DirectForm2Transposed::new(&self.sos), DirectForm2Transposed::new(&self.sos)];
+    pub fn set_curve(&mut self, curve: Curve) {
+        self.filter[0].set_curve(curve);
+        self.filter[1].set_curve(curve);
+    }
+
+    pub fn set_frequency(&mut self, freq_hz: f32) {
+        self.filter[0].set_frequency(freq_hz);
+        self.filter[1].set_frequency(freq_hz);
+    }
+
+    pub fn set_gain(&mut self, gain_dB: f32) {
+        self.filter[0].set_gain(gain_dB);
+        self.filter[1].set_gain(gain_dB);
+    }
+
+    pub fn set_resonance(&mut self, resonance: f32) {
+        self.filter[0].set_resonance(resonance);
+        self.filter[1].set_resonance(resonance);
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: f32) {
+        self.filter[0].set_sample_rate(sample_rate);
+        self.filter[1].set_sample_rate(sample_rate);
+    }
+
+    pub fn reset(&mut self) {
+        self.filter[0].reset();
+        self.filter[1].reset();
     }
 
     pub fn process(&mut self, input: f32, audio_id: usize) -> f32 {
-        self.dft2[audio_id].filter(input)
+        self.filter[audio_id].filter(input)
     }
 }
 
 impl Default for MyFilter {
     fn default() -> Self {
-        let zpk = butter(1, FilterType::LowPass(10.0), 44100.0).unwrap();
-        let sos = zpk2sos(&zpk, None).unwrap();
-        let dft2 = [DirectForm2Transposed::new(&sos), DirectForm2Transposed::new(&sos)];
         Self {
-            zpk,
-            sos,
-            dft2,
+            filter: [Filter::new(44100.0); 2]
         }
     }
 }

@@ -12,10 +12,10 @@ nih_plug_slint.workspace = true
 plugin-canvas.workspace = true
 slint.workspace = true
 pitch_shift.workspace = true
-iir_filters.workspace = true
+simple-eq.workspace = true
 rust-music-theory.workspace = true
-serde = { version = "1.0.197", features = ["derive"] }
-crossbeam = "0.8.4"
+serde.workspace = true
+crossbeam.workspace = true
 
 [build-dependencies]
 slint-build = "1.5.1"
