@@ -94,7 +94,7 @@ impl AudioProcessParams {
                 FloatRange::Skewed {
                     min: db_to_gain(-48.0),
                     max: db_to_gain(12.0),
-                    factor: FloatRange::gain_skew_factor(-20.0, 6.0),
+                    factor: FloatRange::gain_skew_factor(-48.0, 12.0),
                 }
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
@@ -105,7 +105,7 @@ impl AudioProcessParams {
                 FloatRange::Skewed {
                     min: db_to_gain(-48.0),
                     max: db_to_gain(12.0),
-                    factor: FloatRange::gain_skew_factor(-20.0, 6.0),
+                    factor: FloatRange::gain_skew_factor(-48.0, 12.0),
                 }
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
@@ -200,20 +200,19 @@ impl AudioProcess {
     }
 
     pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize) -> f32 {
+        let input: f32 = if self.note_pitch == 0 { input * params.audio_process.in_key_gain.value() } else { input * params.audio_process.off_key_gain.value()};
         let bpf: f32 = self.bpf.process(input, audio_id);
         let threshold: bool = bpf >= params.audio_process.threshold.value();
         let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) {
             true => self.tuning.process(bpf, audio_id),
             false => self.delay.process(bpf, audio_id)
         };
-        let after_tune_bpf: f32 = match params.audio_process.after_pitch_shift_bandpass.value() && true {
+        let after_tune_bpf: f32 = match params.audio_process.after_pitch_shift_bandpass.value() {
             true => self.after_tune_bpf.process(pitch, audio_id),
             false => pitch
         };
-        let mut output: f32 = 0.0;
-        output = if self.note_pitch == 0 { after_tune_bpf * params.audio_process.in_key_gain.value() } else { after_tune_bpf * params.audio_process.off_key_gain.value()};
-        output = if self.note_pitch == -128 { 0.0 } else { output };
-        output
+        // output = if self.note_pitch == -128 { 0.0 } else { output };
+        after_tune_bpf
     }
 
     pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess>, buffer_config: &BufferConfig, note_pitch: [i8; 84]) {

@@ -127,12 +127,14 @@ impl PitchShifter {
         }
     }
 
+    #[inline]
     pub fn set_pitch(&mut self, shift: f32) {
         self.shift = shift;
         self.pitch_weight = self.shift * self.bin_frequencies;
         self.oversamp_weight = ((self.over_sampling as f32) / TAU) * self.pitch_weight;
     }
 
+    #[inline]
     pub fn set_over_sampling(&mut self, over_sampling: u8) {
         self.step = self.frame_size / over_sampling as u32;
         self.expected = TAU / (over_sampling as f32);
@@ -170,6 +172,7 @@ impl PitchShifter {
     /// an output buffer of the same length in `out_b`.
     ///
     /// Note: It's actually not magic, sadly.
+    #[inline]
     pub fn process(&mut self, signal: f32) -> f32 {
         self.in_fifo[self.overlap as usize] = signal;
         let out = self.out_fifo[(self.overlap - self.fifo_latency) as usize];
@@ -242,5 +245,12 @@ impl PitchShifter {
             self.in_fifo.copy_within(self.step as usize..((self.step + self.fifo_latency) as usize), 0);
         }
         out
+    }
+
+    #[inline]
+    pub fn process_buffer(&mut self, input: &mut [f32]) {
+        for sample in input.iter_mut() {
+            *sample = self.process(*sample);
+        }
     }
 }

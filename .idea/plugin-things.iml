@@ -11,6 +11,7 @@
       <sourceFolder url="file://$MODULE_DIR$/lib/iir_filters/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/lib/pitch_shift/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/lib/pitch_shift/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/lib/simple-eq/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
