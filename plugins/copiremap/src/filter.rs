@@ -1,4 +1,4 @@
-use simple_eq::design::{Curve, Design, normalize_frequency};
+use simple_eq::design::{Curve, Design};
 use simple_eq::filter::Filter;
 
 pub struct MyFilter {

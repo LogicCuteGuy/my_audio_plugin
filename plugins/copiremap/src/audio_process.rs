@@ -5,7 +5,7 @@ use nih_plug::formatters;
 use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
 use nih_plug::prelude::{FloatRange, IntRange};
 use nih_plug::util::db_to_gain;
-use iir_filters::filter_design::FilterType;
+use simple_eq::design::Curve;
 use crate::{PluginParams};
 use crate::delay::Delay;
 use crate::filter::MyFilter;
@@ -25,6 +25,9 @@ pub struct AudioProcessParams {
 
     #[id = "after_pitch_shift_bandpass"]
     pub after_pitch_shift_bandpass: BoolParam,
+
+    #[id = "after_pitch_shift_bandpass_resonance"]
+    pub after_pitch_shift_bandpass_resonance: FloatParam,
 
     #[id = "in_key_gain"]
     pub in_key_gain: FloatParam,
@@ -58,7 +61,7 @@ impl AudioProcessParams {
                 1,
                 IntRange::Linear {
                     min: 1,
-                    max: 16,
+                    max: 8,
                 }
             ).with_callback(
                 {
@@ -71,6 +74,15 @@ impl AudioProcessParams {
                 "After Pitch Shift Bandpass",
                 false,
             ),
+            after_pitch_shift_bandpass_resonance: FloatParam::new("After Pitch Shift Bandpass Resonance", 10.0, FloatRange::Linear{ min: 1.0, max: 150.0 })
+                .with_callback(
+                    {
+                        let update_pitch_shift_and_after_bandpass = update_pitch_shift_and_after_bandpass.clone();
+                        Arc::new(move |_| {
+                            update_pitch_shift_and_after_bandpass.store(true, Ordering::Release);
+                        })
+                    }
+                ),
             in_key_gain: FloatParam::new(
                 "In Key Gain",
                 0.0,
@@ -98,7 +110,7 @@ impl AudioProcessParams {
                 2,
                 IntRange::Linear {
                     min: 1,
-                    max: 200,
+                    max: 20,
                 }
             ).with_unit("ms")
                 .with_callback(
@@ -138,32 +150,28 @@ impl AudioProcess96 {
     }
 
     pub fn setup(&mut self, params: Arc<PluginParams>, note: u8, buffer_config: &BufferConfig) {
-        let mut lowpass: f32 = 0.0;
-        let mut highpass: f32 = 0.0;
-        hz_cal_clh(note, &mut self.center_hz, &mut lowpass, &mut highpass, params.global.hz_center.value());
-        self.bpf.set_filter(params.global.order.value() as u8, FilterType::BandPass(lowpass, highpass), buffer_config.sample_rate);
-        // println!("{}, {}", lowpass, highpass);
+        hz_cal_clh(note, &mut self.center_hz, params.global.hz_center.value());
+        self.bpf.set(Curve::Bandpass, self.center_hz, params.global.resonance.value(), 0.0, buffer_config.sample_rate);
+        println!("{}", self.center_hz);
         let mut pitch_tune_hz: f32 = 0.0;
-        let mut lowpass: f32 = 0.0;
-        let mut highpass: f32 = 0.0;
-        let note_pitch: i8 = params.note_table.i2t.load().i84[(note - 24) as usize];
+        let mut bandpass: f32 = 0.0;
+        let note_pitch: i8 = params.note_table.i2t.load().i104[(note - 24) as usize];
         self.note_pitch = note_pitch;
-        hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut lowpass, &mut highpass, params.global.hz_center.value(), params.global.hz_tuning.value());
+        hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value());
         self.tuning_hz = pitch_tune_hz.clone();
         self.tuning.set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz);
-        self.after_tune_bpf.set_filter(params.audio_process.order_after_pitch_shift_bandpass.value() as u8, FilterType::BandPass(lowpass, highpass), buffer_config.sample_rate);
+        self.after_tune_bpf.set(Curve::Bandpass, bandpass, params.audio_process.after_pitch_shift_bandpass_resonance.value(), 0.0, buffer_config.sample_rate);
         self.note = note;
     }
 
     pub fn set_pitch_shift_and_after_bandpass(&mut self, params: Arc<PluginParams>, note_pitch: i8, buffer_config: &BufferConfig) {
-        let mut lowpass: f32 = 0.0;
-        let mut highpass: f32 = 0.0;
+        let mut bandpass: f32 = 0.0;
         let mut pitch_tune_hz: f32 = 0.0;
         self.note_pitch = note_pitch;
-        hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut lowpass, &mut highpass, params.global.hz_center.value(), params.global.hz_tuning.value());
+        hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value());
         self.tuning_hz = pitch_tune_hz.clone();
         self.tuning.set_pitch(pitch_tune_hz);
-        self.after_tune_bpf.set_filter(params.audio_process.order_after_pitch_shift_bandpass.value() as u8, FilterType::BandPass(lowpass, highpass), buffer_config.sample_rate);
+        self.after_tune_bpf.set(Curve::Bandpass, bandpass, params.audio_process.after_pitch_shift_bandpass_resonance.value(), 0.0, buffer_config.sample_rate)
     }
 
     pub fn set_pitch_shift_over_sampling(&mut self, params: Arc<PluginParams>) {
@@ -176,10 +184,8 @@ impl AudioProcess96 {
     }
 
     pub fn set_bpf_center_hz(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig) {
-        let mut lowpass: f32 = 0.0;
-        let mut highpass: f32 = 0.0;
-        hz_cal_clh(self.note, &mut self.center_hz, &mut lowpass, &mut highpass, params.global.hz_center.value());
-        self.bpf.set_filter(params.global.order.value() as u8, FilterType::BandPass(lowpass, highpass), buffer_config.sample_rate);
+        hz_cal_clh(self.note, &mut self.center_hz, params.global.hz_center.value());
+        self.bpf.set(Curve::Bandpass, self.center_hz, params.global.resonance.value(), 0.0, buffer_config.sample_rate);
     }
 
     pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize) -> f32 {
@@ -198,7 +204,7 @@ impl AudioProcess96 {
         after_tune_bpf
     }
 
-    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut [AudioProcess96; 96], buffer_config: &BufferConfig, note_pitch: [i8; 84]) {
+    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig, note_pitch: [i8; 104]) {
         for (i, ap) in audio_process.iter_mut().enumerate() {
             ap.set_pitch_shift_and_after_bandpass(params.clone(), note_pitch[i], &buffer_config);
         }

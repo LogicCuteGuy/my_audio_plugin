@@ -43,6 +43,6 @@ impl Default for Delay {
     }
 }
 
-pub fn latency_average(ap: &Vec<AudioProcess96>) -> u32 {
+pub fn latency_average96(ap: &Vec<AudioProcess96>) -> u32 {
     ap[0].get_latency()
 }
