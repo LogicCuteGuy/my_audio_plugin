@@ -34,7 +34,7 @@ pub struct AudioProcessParams {
 }
 
 impl AudioProcessParams {
-    pub fn new(update_pitch_shift_over_sampling: Arc<AtomicBool>, update_pitch_shift_window_duration_ms: Arc<AtomicBool>) -> Self {
+    pub fn new(update_pitch_shift_over_sampling: Arc<AtomicBool>, update_pitch_shift_window_duration_ms: Arc<AtomicBool>, update_pitch_shift_and_after_bandpass: Arc<AtomicBool>) -> Self {
         Self {
             threshold: FloatParam::new(
                 "Threshold",
@@ -49,7 +49,12 @@ impl AudioProcessParams {
             pitch_shift: BoolParam::new(
                 "Pitch Shift",
                 true,
-            ),
+            ).with_callback({
+                let update_pitch_shift_and_after_bandpass = update_pitch_shift_and_after_bandpass.clone();
+                Arc::new(move |_| {
+                    update_pitch_shift_and_after_bandpass.store(true, Ordering::Release);
+                })
+            }),
             pitch_shift_over_sampling: IntParam::new(
                 "Pitch Shift Over Sampling",
                 1,
@@ -131,13 +136,13 @@ impl AudioProcess108 {
 
     pub fn setup(&mut self, params: Arc<PluginParams>, note: u8, buffer_config: &BufferConfig) {
         let note_pitch: i8 = params.note_table.i2t.load().i108[note as usize];
-        hz_cal_clh(note, note_pitch, &mut self.center_hz, params.global.hz_center.value());
+        hz_cal_clh(note, note_pitch, &mut self.center_hz, params.global.hz_center.value(), !params.audio_process.pitch_shift.value());
         self.bpf.set(Curve::Bandpass, self.center_hz, params.global.resonance.value(), 0.0, buffer_config.sample_rate);
         println!("{}", self.center_hz);
         let mut pitch_tune_hz: f32 = 0.0;
         let mut bandpass: f32 = 0.0;
         self.note_pitch = note_pitch;
-        hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value());
+        hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value(), !params.audio_process.pitch_shift.value());
         self.tuning_hz = pitch_tune_hz.clone();
         self.tuning.set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz);
         self.note = note;
@@ -146,7 +151,7 @@ impl AudioProcess108 {
     pub fn set_pitch_shift_and_after_bandpass(&mut self, params: Arc<PluginParams>, note_pitch: i8, buffer_config: &BufferConfig) {
         let mut bandpass: f32 = 0.0;
         let mut pitch_tune_hz: f32 = 0.0;
-        hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value());
+        hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value(), !params.audio_process.pitch_shift.value());
         self.bpf.set(Curve::Bandpass, bandpass, params.global.resonance.value(), 0.0, buffer_config.sample_rate);
         self.note_pitch = note_pitch;
         self.tuning_hz = pitch_tune_hz.clone();
@@ -162,12 +167,9 @@ impl AudioProcess108 {
         self.tuning.set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch);
     }
 
-    pub fn set_bpf_center_hz(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig, update_pitch_shift_and_after_bandpass: Arc<AtomicBool>) {
-        if update_pitch_shift_and_after_bandpass.load(Ordering::SeqCst) == true {
-            return;
-        }
+    pub fn set_bpf_center_hz(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig) {
         let note_pitch: i8 = params.note_table.i2t.load().i108[self.note as usize];
-        hz_cal_clh(self.note, note_pitch, &mut self.center_hz, params.global.hz_center.value());
+        hz_cal_clh(self.note, note_pitch, &mut self.center_hz, params.global.hz_center.value(), !params.audio_process.pitch_shift.value());
         self.bpf.set(Curve::Bandpass, self.center_hz, params.global.resonance.value(), 0.0, buffer_config.sample_rate);
     }
 

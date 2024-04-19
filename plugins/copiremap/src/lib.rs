@@ -101,9 +101,9 @@ impl GlobalParams {
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             dry_gain: FloatParam::new("Dry Gain", db_to_gain(-24.0), FloatRange::Skewed {
-                min: db_to_gain(-48.0),
+                min: db_to_gain(-60.0),
                 max: db_to_gain(6.0),
-                factor: FloatRange::gain_skew_factor(-48.0, 6.0),
+                factor: FloatRange::gain_skew_factor(-60.0, 6.0),
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
@@ -120,7 +120,7 @@ impl GlobalParams {
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 30.0, max: 150.0 })
+            resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 200.0 })
                 .with_callback(
                     {
                         let update_bpf_center_hz = update_bpf_center_hz.clone();
@@ -374,7 +374,7 @@ impl Default for CoPiReMapPlugin {
             params: Arc::new(PluginParams {
                 note_table: Arc::new(NoteTables::default()),
                 global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone())),
-                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone())),
+                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone(), update_pitch_shift_and_after_bandpass.clone())),
                 key_note: Arc::new(KeyNoteParams::new(update_key_note.clone())),
             }),
             buffer_config: BufferConfig {
@@ -436,10 +436,10 @@ impl Plugin for CoPiReMapPlugin {
     {
         self.buffer_config = *buffer_config;
         let mut lowpass: f32 = 0.0;
-        hz_cal_clh((self.params.global.low_note_off.value() - 24) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value());
+        hz_cal_clh((self.params.global.low_note_off.value() - 24) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
         self.lpf.set(Curve::Lowpass, lowpass, 1.0, 0.0, buffer_config.sample_rate);
         let mut highpass: f32 = 0.0;
-        hz_cal_clh((self.params.global.high_note_off.value() - 24) as u8, 0, &mut highpass, self.params.global.hz_tuning.value());
+        hz_cal_clh((self.params.global.high_note_off.value() - 24) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
         self.hpf.set(Curve::Highpass, highpass, 1.0, 0.0, buffer_config.sample_rate);
         for (i, audio_process) in self.audio_process108.iter_mut().enumerate() {
             audio_process.setup(self.params.clone(), i as u8, &self.buffer_config);
@@ -500,7 +500,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     let mut lowpass: f32 = 0.0;
-                    hz_cal_clh((self.params.global.low_note_off.value() - 24) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value());
+                    hz_cal_clh((self.params.global.low_note_off.value() - 24) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
                     self.lpf.set_frequency(lowpass);
                 }
                 if self
@@ -509,7 +509,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     let mut highpass: f32 = 0.0;
-                    hz_cal_clh((self.params.global.high_note_off.value() - 24) as u8, 0, &mut highpass, self.params.global.hz_tuning.value());
+                    hz_cal_clh((self.params.global.high_note_off.value() - 24) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
                     self.hpf.set_frequency(highpass);
                 }
                 if self
