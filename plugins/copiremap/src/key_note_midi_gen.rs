@@ -4,7 +4,7 @@ use crate::{PluginParams};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use nih_plug::audio_setup::BufferConfig;
-use crate::audio_process::AudioProcess96;
+use crate::audio_process::AudioProcess108;
 use crate::note_table::NoteTablesArray;
 
 #[derive(Params)]
@@ -80,7 +80,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            find_off_key: IntParam::new("Find Off Key", 4, IntRange::Linear{ min: 0, max: 48 })
+            find_off_key: IntParam::new("Find Off Key", 4, IntRange::Linear{ min: 0, max: 72 })
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -211,13 +211,13 @@ impl KeyNoteParams {
 }
 
 pub struct MidiNote {
-    pub note: [bool; 104]
+    pub note: [bool; 108]
 }
 
 impl Default for MidiNote {
     fn default() -> Self {
-        let mut note = [false; 104];
-        for i in 0..104 {
+        let mut note = [false; 108];
+        for i in 0..108 {
             note[i] = false;
         }
         Self {
@@ -228,13 +228,13 @@ impl Default for MidiNote {
 
 impl MidiNote {
 
-    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
-        let mut notes: [i8; 104] = params.note_table.i2t.load().i104;
+    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess108>, buffer_config: &BufferConfig) {
+        let mut notes: [i8; 108] = params.note_table.i2t.load().i108;
         match params.key_note.repeat.value() {
             true => {
-                let mut note_on_keys = [false; 104];
-                let mut notes_sel: [i8; 104] = [-128; 104];
-                for i in 0..104 {
+                let mut note_on_keys = [false; 108];
+                let mut notes_sel: [i8; 108] = [-128; 108];
+                for i in 0..108 {
                     let a: u8 = i % 12;
                     match a {
                         0 => { note_on_keys[i as usize] = params.key_note.c.value(); }
@@ -258,25 +258,25 @@ impl MidiNote {
             false => {
             }
         }
-        params.note_table.i2t.store(NoteTablesArray { i104: notes});
-        AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
+        params.note_table.i2t.store(NoteTablesArray { i108: notes});
+        AudioProcess108::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
-    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
-        let mut notes: [i8; 104] = params.note_table.im2t.load().i104;
+    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess108>, buffer_config: &BufferConfig) {
+        let mut notes: [i8; 108] = params.note_table.im2t.load().i108;
         match params.key_note.repeat.value() {
             true => {
-                let mut note_on_keys = [false; 104];
+                let mut note_on_keys = [false; 108];
                 let mut note_keys = [false; 12];
-                let mut notes_sel: [i8; 104] = [-128; 104];
-                for i in 0..104 {
+                let mut notes_sel: [i8; 108] = [-128; 108];
+                for i in 0..108 {
                     let a: u8 = i % 12;
                     match self.note[i as usize] {
                         true => { note_keys[a as usize] = true; }
                         false => {}
                     }
                 }
-                for i in 0..104 {
+                for i in 0..108 {
                     let a: u8 = i % 12;
                     match a {
                         0 => { note_on_keys[i as usize] = note_keys[0]; }
@@ -298,16 +298,16 @@ impl MidiNote {
                 notes = notes_sel;
             }
             false => {
-                let mut notes_sel: [i8; 104] = [-128; 104];
+                let mut notes_sel: [i8; 108] = [-128; 108];
                 self.find_off_key(params.clone(), &self.note, &mut notes_sel);
                 notes = notes_sel;
             }
         }
-        params.note_table.im2t.store(NoteTablesArray { i104: notes});
-        AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
+        params.note_table.im2t.store(NoteTablesArray { i108: notes});
+        AudioProcess108::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
-    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 104], notes_sel: &mut [i8; 104]) {
+    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 108], notes_sel: &mut [i8; 108]) {
         for i in 0..params.key_note.find_off_key.value() {
             match params.key_note.round_up.value() {
                 true => {
@@ -354,7 +354,7 @@ impl MidiNote {
         }
     }
 
-    pub fn param_update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
+    pub fn param_update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess108>, buffer_config: &BufferConfig) {
         match params.key_note.midi.value() {
             true => self.update_midi(params, audio_process, buffer_config),
             false => self.update(params, audio_process, buffer_config),

@@ -7,6 +7,7 @@ pub struct MyFilter {
 
 impl MyFilter {
     pub fn set(&mut self, curve: Curve, frequency: f32, resonance: f32, gain: f32, sample_rate: f32) {
+        // println!("{}", frequency);
         self.filter[0].set(curve, frequency, resonance, gain, sample_rate);
         self.filter[1].set(curve, frequency, resonance, gain, sample_rate);
     }
