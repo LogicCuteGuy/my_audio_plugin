@@ -64,9 +64,6 @@ pub struct GlobalParams {
     #[id = "global_threshold"]
     pub global_threshold: FloatParam,
 
-    #[id = "resonance"]
-    pub resonance: FloatParam,
-
     #[id = "low_note_off"]
     pub low_note_off: IntParam,
 
@@ -120,15 +117,6 @@ impl GlobalParams {
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 200.0 })
-                .with_callback(
-                    {
-                        let update_bpf_center_hz = update_bpf_center_hz.clone();
-                        Arc::new(move |_| {
-                            update_bpf_center_hz.store(true, Ordering::Release);
-                        })
-                    }
-                ),
             low_note_off: IntParam::new(
                 "Low Note Off",
                 24,
@@ -350,6 +338,7 @@ pub struct CoPiReMapPlugin {
     update_pitch_shift_over_sampling: Arc<AtomicBool>,
     update_pitch_shift_window_duration_ms: Arc<AtomicBool>,
     update_bpf_center_hz: Arc<AtomicBool>,
+    set_pitch_shift_12_node: Arc<AtomicBool>,
 
     update_key_note: Arc<AtomicBool>,
 }
@@ -363,8 +352,10 @@ impl Default for CoPiReMapPlugin {
         let update_pitch_shift_over_sampling = Arc::new(AtomicBool::new(false));
         let update_pitch_shift_window_duration_ms = Arc::new(AtomicBool::new(false));
         let update_bpf_center_hz = Arc::new(AtomicBool::new(false));
+        let set_pitch_shift_12_node = Arc::new(AtomicBool::new(false));
 
         let update_key_note = Arc::new(AtomicBool::new(false));
+
         let mut audio_process108 = Vec::with_capacity(108);
         for _ in 0..108 {
             audio_process108.push(AudioProcess108::default());
@@ -374,7 +365,7 @@ impl Default for CoPiReMapPlugin {
             params: Arc::new(PluginParams {
                 note_table: Arc::new(NoteTables::default()),
                 global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone())),
-                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone(), update_pitch_shift_and_after_bandpass.clone())),
+                audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone(), update_pitch_shift_and_after_bandpass.clone(), update_bpf_center_hz.clone(), set_pitch_shift_12_node.clone())),
                 key_note: Arc::new(KeyNoteParams::new(update_key_note.clone())),
             }),
             buffer_config: BufferConfig {
@@ -394,6 +385,7 @@ impl Default for CoPiReMapPlugin {
             update_pitch_shift_over_sampling,
             update_pitch_shift_window_duration_ms,
             update_bpf_center_hz,
+            set_pitch_shift_12_node,
             update_key_note
         }
     }
@@ -551,6 +543,15 @@ impl Plugin for CoPiReMapPlugin {
                     }
                 }
                 if self
+                    .set_pitch_shift_12_node
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    for ap in self.audio_process108.iter_mut() {
+                        ap.set_pitch_shift_12_node(self.params.clone(), &self.buffer_config);
+                    }
+                }
+                if self
                     .update_key_note
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
@@ -598,9 +599,30 @@ impl Plugin for CoPiReMapPlugin {
                         let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => hpf };
                         if audio >= self.params.global.global_threshold.value() || true {
                             let mut audio_process: f32 = 0.0;
-                            for (ii, ap) in self.audio_process108.iter_mut().enumerate() {
-                                if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
-                                    audio_process += ap.process(audio, self.params.clone(), i);
+                            match self.params.audio_process.pitch_shift_12_node.value() {
+                                true => {
+                                    let mut pitch: [f32; 12] = [0.0; 12];
+                                    let mut index = 0;
+                                    for ap in self.audio_process108.iter_mut() {
+                                        if index >= 12 {
+                                            index = 0;
+                                        }
+                                        if ap.note < 12 {
+                                            pitch[index] = ap.process(audio, self.params.clone(), i);
+                                        }
+                                        if ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 && ap.note as usize <= self.params.global.high_note_off.value() as usize - 24 {
+                                            audio_process += ap.process_bpf(pitch[index], self.params.clone(), i);
+                                            // println!("Work {}, {}", ii, ap.note);
+                                        }
+                                        index += 1;
+                                    }
+                                }
+                                false => {
+                                    for (ii, ap) in self.audio_process108.iter_mut().enumerate() {
+                                        if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
+                                            audio_process += ap.process(audio, self.params.clone(), i);
+                                        }
+                                    }
                                 }
                             }
                             audio = (audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
