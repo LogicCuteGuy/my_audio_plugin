@@ -35,6 +35,9 @@ pub struct AudioProcessParams {
     #[id = "in_key_gain"]
     pub in_key_gain: FloatParam,
 
+    #[id = "tuning_gain"]
+    pub tuning_gain: FloatParam,
+
     #[id = "off_key_gain"]
     pub off_key_gain: FloatParam,
 
@@ -107,9 +110,20 @@ impl AudioProcessParams {
                 "In Key Gain",
                 db_to_gain(0.0),
                 FloatRange::Skewed {
-                    min: db_to_gain(-60.0),
+                    min: db_to_gain(-65.0),
                     max: db_to_gain(12.0),
-                    factor: FloatRange::gain_skew_factor(-60.0, 12.0),
+                    factor: FloatRange::gain_skew_factor(-65.0, 12.0),
+                }
+            ).with_unit(" dB")
+                .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
+                .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            tuning_gain: FloatParam::new(
+                "Tuning Gain",
+                db_to_gain(0.0),
+                FloatRange::Skewed {
+                    min: db_to_gain(-65.0),
+                    max: db_to_gain(12.0),
+                    factor: FloatRange::gain_skew_factor(-65.0, 12.0),
                 }
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
@@ -118,9 +132,9 @@ impl AudioProcessParams {
                 "Off Key Gain",
                 db_to_gain(0.0),
                 FloatRange::Skewed {
-                    min: db_to_gain(-60.0),
+                    min: db_to_gain(-65.0),
                     max: db_to_gain(12.0),
-                    factor: FloatRange::gain_skew_factor(-60.0, 12.0),
+                    factor: FloatRange::gain_skew_factor(-65.0, 12.0),
                 }
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
@@ -130,7 +144,7 @@ impl AudioProcessParams {
                 7,
                 IntRange::Linear {
                     min: 1,
-                    max: 50,
+                    max: 100,
                 }
             ).with_unit("ms")
                 .with_callback(
@@ -148,8 +162,8 @@ pub struct AudioProcess108 {
     bpf: Option<MyFilter>,
     tuning: Option<MyPitch>,
     delay: Delay,
-    pub(crate) note: u8,
-    note_pitch: i8
+    pub note: u8,
+    pub note_pitch: i8,
 }
 
 impl AudioProcess108 {
@@ -282,8 +296,7 @@ impl AudioProcess108 {
         }
     }
 
-    pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize) -> f32 {
-        let input: f32 = if self.note_pitch == 0 { input * params.audio_process.in_key_gain.value() } else { input * params.audio_process.off_key_gain.value()};
+    pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32) -> f32 {
         let threshold: bool = input >= params.audio_process.threshold.value();
         let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) {
             true => match self.tuning.as_mut() {
@@ -310,10 +323,14 @@ impl AudioProcess108 {
             false => {
                 match params.audio_process.fft_mode.value() {
                     true => {
-                        input
+                        pitch
                     }
                     false => {
-                        self.process_bpf(pitch, params, audio_id)
+                        if input_param > db_to_gain(-60.0) {
+                            self.process_bpf(pitch, params, audio_id, input_param)
+                        } else {
+                            0.0
+                        }
                     }
                 }
             }
@@ -322,13 +339,13 @@ impl AudioProcess108 {
         bpf
     }
 
-    pub fn process_bpf(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize) -> f32 {
+    pub fn process_bpf(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32) -> f32 {
         match params.audio_process.fft_mode.value() {
             true => {
-                input
+                input * input_param
             }
             false => {
-                self.bpf.as_mut().unwrap().process(input, audio_id)
+                self.bpf.as_mut().unwrap().process(input, audio_id) * input_param
             }
         }
     }

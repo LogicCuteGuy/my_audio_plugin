@@ -105,9 +105,9 @@ impl GlobalParams {
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             lhf_gain: FloatParam::new("Low/HighPass Gain", db_to_gain(0.0), FloatRange::Skewed {
-                min: db_to_gain(-24.0),
+                min: db_to_gain(-48.0),
                 max: db_to_gain(12.0),
-                factor: FloatRange::gain_skew_factor(-24.0, 12.0),
+                factor: FloatRange::gain_skew_factor(-48.0, 12.0),
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
@@ -591,13 +591,10 @@ impl Plugin for CoPiReMapPlugin {
                 }
                 for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
                     for sample in channel.iter_mut() {
-                        let mut audio: f32 = *sample;
-                        let delay = self.delay.process(audio, i);
-                        let lpf = self.lpf.process(delay, i);
-                        let hpf = self.hpf.process(delay, i);
-                        let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => lpf };
-                        let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => hpf };
-                        if audio >= self.params.global.global_threshold.value() || true {
+                        let delay = self.delay.process(*sample, i);
+                        let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => self.lpf.process(delay, i) };
+                        let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => self.hpf.process(delay, i) };
+                        if 0.0 >= self.params.global.global_threshold.value() || true {
                             let mut audio_process: f32 = 0.0;
                             match self.params.audio_process.pitch_shift_12_node.value() {
                                 true => {
@@ -607,11 +604,12 @@ impl Plugin for CoPiReMapPlugin {
                                         if index >= 12 {
                                             index = 0;
                                         }
+                                        let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
                                         if ap.note < 12 {
-                                            pitch[index] = ap.process(audio, self.params.clone(), i);
+                                            pitch[index] = ap.process(*sample, self.params.clone(), i, input_param);
                                         }
-                                        if ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 && ap.note as usize <= self.params.global.high_note_off.value() as usize - 24 {
-                                            audio_process += ap.process_bpf(pitch[index], self.params.clone(), i);
+                                        if input_param > db_to_gain(-60.0) && ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 && ap.note as usize <= self.params.global.high_note_off.value() as usize - 24 {
+                                            audio_process += ap.process_bpf(pitch[index], self.params.clone(), i, input_param);
                                             // println!("Work {}, {}", ii, ap.note);
                                         }
                                         index += 1;
@@ -620,16 +618,16 @@ impl Plugin for CoPiReMapPlugin {
                                 false => {
                                     for (ii, ap) in self.audio_process108.iter_mut().enumerate() {
                                         if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
-                                            audio_process += ap.process(audio, self.params.clone(), i);
+                                            let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
+                                            audio_process += ap.process(*sample, self.params.clone(), i, input_param);
                                         }
                                     }
                                 }
                             }
-                            audio = (audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
+                            *sample = (audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
                         } else {
-                            audio = (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
+                            *sample = (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
                         }
-                        *sample = audio;
                     }
                 }
             }
