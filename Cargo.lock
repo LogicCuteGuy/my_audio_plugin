@@ -2697,7 +2697,7 @@ dependencies = [
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#245add6530f1c7d83fea5e23636145d982af4d66"
+source = "git+https://github.com/robbert-vdh/nih-plug/#245add6530f1c7d83fea5e23636145d982af4d66"
 dependencies = [
  "anyhow",
  "anymap",
@@ -2734,7 +2734,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#245add6530f1c7d83fea5e23636145d982af4d66"
+source = "git+https://github.com/robbert-vdh/nih-plug/#245add6530f1c7d83fea5e23636145d982af4d66"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2757,7 +2757,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_xtask"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#245add6530f1c7d83fea5e23636145d982af4d66"
+source = "git+https://github.com/robbert-vdh/nih-plug/#245add6530f1c7d83fea5e23636145d982af4d66"
 dependencies = [
  "anyhow",
  "goblin",

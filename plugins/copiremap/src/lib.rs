@@ -600,7 +600,8 @@ impl Plugin for CoPiReMapPlugin {
                                 true => {
                                     let mut pitch: [f32; 12] = [0.0; 12];
                                     let mut index = 0;
-                                    for ap in self.audio_process108.iter_mut() {
+                                    for ii in 0..((self.params.global.high_note_off.value() as usize - 24) + 1) {
+                                        let mut ap = self.audio_process108.get_mut(ii).unwrap();
                                         if index >= 12 {
                                             index = 0;
                                         }
@@ -608,7 +609,7 @@ impl Plugin for CoPiReMapPlugin {
                                         if ap.note < 12 {
                                             pitch[index] = ap.process(*sample, self.params.clone(), i, input_param);
                                         }
-                                        if input_param > db_to_gain(-60.0) && ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 && ap.note as usize <= self.params.global.high_note_off.value() as usize - 24 {
+                                        if input_param > db_to_gain(-60.0) && ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 {
                                             audio_process += ap.process_bpf(pitch[index], self.params.clone(), i, input_param);
                                             // println!("Work {}, {}", ii, ap.note);
                                         }
@@ -616,11 +617,13 @@ impl Plugin for CoPiReMapPlugin {
                                     }
                                 }
                                 false => {
-                                    for (ii, ap) in self.audio_process108.iter_mut().enumerate() {
-                                        if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
-                                            let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
-                                            audio_process += ap.process(*sample, self.params.clone(), i, input_param);
-                                        }
+                                    for ii in (self.params.global.low_note_off.value() as usize - 24)..((self.params.global.high_note_off.value() as usize - 24) + 1) {
+                                        let mut ap = self.audio_process108.get_mut(ii).unwrap();
+                                        let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
+                                        audio_process += ap.process(*sample, self.params.clone(), i, input_param);
+                                        // if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
+                                        //
+                                        // }
                                     }
                                 }
                             }
