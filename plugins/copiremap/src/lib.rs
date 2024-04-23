@@ -20,7 +20,7 @@ use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
 use simple_eq::design::Curve;
-use crate::audio_process::{AudioProcess108, AudioProcessParams};
+use crate::audio_process::{AudioProcess96, AudioProcessParams};
 use crate::delay::{Delay, latency_average96};
 use crate::filter::MyFilter;
 use crate::hertz_calculator::hz_cal_clh;
@@ -119,9 +119,9 @@ impl GlobalParams {
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
             low_note_off: IntParam::new(
                 "Low Note Off",
-                24,
+                36,
                 IntRange::Linear {
-                    min: 24,
+                    min: 36,
                     max: 131,
                 },
             ).with_value_to_string(formatters::v2s_i32_note_formatter())
@@ -138,7 +138,7 @@ impl GlobalParams {
                 "High Note Off",
                 131,
                 IntRange::Linear {
-                    min: 24,
+                    min: 36,
                     max: 131,
                 }
             ).with_value_to_string(formatters::v2s_i32_note_formatter())
@@ -326,7 +326,7 @@ pub struct CoPiReMapPlugin {
     params: Arc<PluginParams>,
     buffer_config: BufferConfig,
     midi_note: MidiNote,
-    audio_process108: Vec<AudioProcess108>,
+    audio_process96: Vec<AudioProcess96>,
     lpf: MyFilter,
     hpf: MyFilter,
     delay: Delay,
@@ -356,9 +356,9 @@ impl Default for CoPiReMapPlugin {
 
         let update_key_note = Arc::new(AtomicBool::new(false));
 
-        let mut audio_process108 = Vec::with_capacity(108);
-        for _ in 0..108 {
-            audio_process108.push(AudioProcess108::default());
+        let mut audio_process96 = Vec::with_capacity(96);
+        for _ in 0..96 {
+            audio_process96.push(AudioProcess96::default());
         };
 
         Self {
@@ -375,7 +375,7 @@ impl Default for CoPiReMapPlugin {
                 process_mode: ProcessMode::Realtime,
             },
             midi_note: MidiNote::default(),
-            audio_process108,
+            audio_process96: audio_process96,
             lpf: MyFilter::default(),
             hpf: MyFilter::default(),
             delay: Delay::default(),
@@ -428,20 +428,20 @@ impl Plugin for CoPiReMapPlugin {
     {
         self.buffer_config = *buffer_config;
         let mut lowpass: f32 = 0.0;
-        hz_cal_clh((self.params.global.low_note_off.value() - 24) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
+        hz_cal_clh((self.params.global.low_note_off.value() - 36) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
         self.lpf.set(Curve::Lowpass, lowpass, 1.0, 0.0, buffer_config.sample_rate);
         let mut highpass: f32 = 0.0;
-        hz_cal_clh((self.params.global.high_note_off.value() - 24) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
+        hz_cal_clh((self.params.global.high_note_off.value() - 36) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
         self.hpf.set(Curve::Highpass, highpass, 1.0, 0.0, buffer_config.sample_rate);
-        for (i, audio_process) in self.audio_process108.iter_mut().enumerate() {
+        for (i, audio_process) in self.audio_process96.iter_mut().enumerate() {
             audio_process.setup(self.params.clone(), i as u8, &self.buffer_config);
         }
-        self.midi_note.param_update(self.params.clone(), &mut self.audio_process108, &self.buffer_config);
+        self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config);
         true
     }
 
     fn reset(&mut self) {
-        for ap in self.audio_process108.iter_mut() {
+        for ap in self.audio_process96.iter_mut() {
             ap.reset();
         }
     }
@@ -478,10 +478,10 @@ impl Plugin for CoPiReMapPlugin {
                 }
             }
             false => {
-                let latency = latency_average96(&self.audio_process108);
+                let latency = latency_average96(&self.audio_process96);
                 if self.delay.get_latency() != latency {
                     self.delay.set_delay(latency);
-                    for ap in self.audio_process108.iter_mut() {
+                    for ap in self.audio_process96.iter_mut() {
                         ap.set_delay(latency)
                     }
                     context.set_latency_samples(latency);
@@ -492,8 +492,13 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     let mut lowpass: f32 = 0.0;
-                    hz_cal_clh((self.params.global.low_note_off.value() - 24) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
+                    let low_note = self.params.global.low_note_off.value() as usize - 36;
+                    hz_cal_clh(low_note as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
                     self.lpf.set_frequency(lowpass);
+                    for ii in low_note..(low_note + 12) {
+                        let mut ap = self.audio_process96.get_mut(ii).unwrap();
+                        ap.set_pitch_shift_12_node(self.params.clone(), &self.buffer_config);
+                    }
                 }
                 if self
                     .update_highpass
@@ -501,7 +506,7 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     let mut highpass: f32 = 0.0;
-                    hz_cal_clh((self.params.global.high_note_off.value() - 24) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
+                    hz_cal_clh((self.params.global.high_note_off.value() - 36) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
                     self.hpf.set_frequency(highpass);
                 }
                 if self
@@ -509,7 +514,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    for ap in self.audio_process108.iter_mut() {
+                    for ap in self.audio_process96.iter_mut() {
                         ap.set_bpf_center_hz(self.params.clone(), &self.buffer_config);
                     }
                 }
@@ -519,17 +524,17 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     let note_table = match self.params.key_note.midi.value() {
-                        true => self.params.note_table.im2t.load().i108,
-                        false => self.params.note_table.i2t.load().i108,
+                        true => self.params.note_table.im2t.load().i96,
+                        false => self.params.note_table.i2t.load().i96,
                     };
-                    AudioProcess108::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process108, &self.buffer_config, note_table);
+                    AudioProcess96::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process96, &self.buffer_config, note_table);
                 }
                 if self
                     .update_pitch_shift_over_sampling
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    for ap in self.audio_process108.iter_mut() {
+                    for ap in self.audio_process96.iter_mut() {
                         ap.set_pitch_shift_over_sampling(self.params.clone());
                     }
                 }
@@ -538,7 +543,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    for ap in self.audio_process108.iter_mut() {
+                    for ap in self.audio_process96.iter_mut() {
                         ap.set_pitch_shift_window_duration_ms(self.params.clone(), &self.buffer_config);
                     }
                 }
@@ -547,7 +552,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    for ap in self.audio_process108.iter_mut() {
+                    for ap in self.audio_process96.iter_mut() {
                         ap.set_pitch_shift_12_node(self.params.clone(), &self.buffer_config);
                     }
                 }
@@ -556,7 +561,7 @@ impl Plugin for CoPiReMapPlugin {
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
                 {
-                    self.midi_note.param_update(self.params.clone(), &mut self.audio_process108, &self.buffer_config);
+                    self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config);
                 }
                 while let Some(event) = context.next_event() {
                     match event {
@@ -566,10 +571,10 @@ impl Plugin for CoPiReMapPlugin {
                             channel,
                             note,
                             velocity,
-                        } => if note >= 12 || note <= 119 {
+                        } => if note >= 24 || note <= 119 {
                             self.midi_note.note[note as usize - 12] = true;
                             match self.params.key_note.midi.value() {
-                                true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process108, &self.buffer_config),
+                                true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config),
                                 false => {},
                             }
                         },
@@ -579,34 +584,35 @@ impl Plugin for CoPiReMapPlugin {
                             channel,
                             note,
                             velocity,
-                        } => if note >= 12 || note <= 119 {
+                        } => if note >= 24 || note <= 119 {
                             self.midi_note.note[note as usize - 12] = false;
                             match self.params.key_note.midi.value() {
-                                true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process108, &self.buffer_config),
+                                true => self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config),
                                 false => {},
                             }
                         },
                         _ => (),
                     }
                 }
+                let mut pitch: [f32; 12] = [0.0; 12];
+                let mut audio_process: f32 = 0.0;
                 for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
                     for sample in channel.iter_mut() {
                         let delay = self.delay.process(*sample, i);
                         let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => self.lpf.process(delay, i) };
                         let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => self.hpf.process(delay, i) };
                         if 0.0 >= self.params.global.global_threshold.value() || true {
-                            let mut audio_process: f32 = 0.0;
                             match self.params.audio_process.pitch_shift_12_node.value() {
                                 true => {
-                                    let mut pitch: [f32; 12] = [0.0; 12];
-                                    let mut index = 0;
-                                    for ii in 0..((self.params.global.high_note_off.value() as usize - 24) + 1) {
-                                        let mut ap = self.audio_process108.get_mut(ii).unwrap();
+                                    let low_note = self.params.global.low_note_off.value() as usize - 36;
+                                    let mut index = low_note % 12;
+                                    for ii in low_note..((self.params.global.high_note_off.value() as usize - 36) + 1) {
+                                        let mut ap = self.audio_process96.get_mut(ii).unwrap();
                                         if index >= 12 {
                                             index = 0;
                                         }
                                         let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
-                                        if ap.note < 12 {
+                                        if ap.note < (low_note + 12) as u8 {
                                             pitch[index] = ap.process(*sample, self.params.clone(), i, input_param);
                                         }
                                         if input_param > db_to_gain(-60.0) && ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 {
@@ -617,8 +623,8 @@ impl Plugin for CoPiReMapPlugin {
                                     }
                                 }
                                 false => {
-                                    for ii in (self.params.global.low_note_off.value() as usize - 24)..((self.params.global.high_note_off.value() as usize - 24) + 1) {
-                                        let mut ap = self.audio_process108.get_mut(ii).unwrap();
+                                    for ii in (self.params.global.low_note_off.value() as usize - 36)..((self.params.global.high_note_off.value() as usize - 36) + 1) {
+                                        let mut ap = self.audio_process96.get_mut(ii).unwrap();
                                         let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
                                         audio_process += ap.process(*sample, self.params.clone(), i, input_param);
                                         // if ii >= self.params.global.low_note_off.value() as usize - 24 && ii <= self.params.global.high_note_off.value() as usize - 24 {
@@ -628,6 +634,7 @@ impl Plugin for CoPiReMapPlugin {
                                 }
                             }
                             *sample = (audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
+                            audio_process = 0.0;
                         } else {
                             *sample = (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value());
                         }

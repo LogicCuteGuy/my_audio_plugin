@@ -4,7 +4,7 @@ use crate::{PluginParams};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use nih_plug::audio_setup::BufferConfig;
-use crate::audio_process::AudioProcess108;
+use crate::audio_process::AudioProcess96;
 use crate::note_table::NoteTablesArray;
 
 #[derive(Params)]
@@ -21,14 +21,14 @@ pub struct KeyNoteParams {
     #[id = "round_up"]
     pub round_up: BoolParam,
 
-    #[id = "c"]
-    pub c: BoolParam,
+    #[id = "note_c"]
+    pub note_c: BoolParam,
 
-    #[id = "c_sharp"]
-    pub c_sharp: BoolParam,
+    #[id = "note_c_sharp"]
+    pub note_c_sharp: BoolParam,
 
-    #[id = "d"]
-    pub d: BoolParam,
+    #[id = "note_d"]
+    pub note_d: BoolParam,
 
     #[id = "d_sharp"]
     pub d_sharp: BoolParam,
@@ -98,7 +98,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            c: BoolParam::new("C", false)
+            note_c: BoolParam::new("Note C", false)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -107,7 +107,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            c_sharp: BoolParam::new("C#", false)
+            note_c_sharp: BoolParam::new("Note C#", false)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -116,7 +116,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            d: BoolParam::new("D", true)
+            note_d: BoolParam::new("Note D", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -125,7 +125,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            d_sharp: BoolParam::new("D#", false)
+            d_sharp: BoolParam::new("Note D#", false)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -134,7 +134,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            e: BoolParam::new("E", true)
+            e: BoolParam::new("Note E", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -143,7 +143,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            f: BoolParam::new("F", false)
+            f: BoolParam::new("Note F", false)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -152,7 +152,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            f_sharp: BoolParam::new("F#", true)
+            f_sharp: BoolParam::new("Note F#", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -161,7 +161,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            g: BoolParam::new("G", true)
+            g: BoolParam::new("Note G", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -170,7 +170,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            g_sharp: BoolParam::new("G#", false)
+            g_sharp: BoolParam::new("Note G#", false)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -179,7 +179,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            a: BoolParam::new("A", true)
+            a: BoolParam::new("Note A", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -188,7 +188,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            a_sharp: BoolParam::new("A#", false)
+            a_sharp: BoolParam::new("Note A#", false)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -197,7 +197,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            b: BoolParam::new("B", true)
+            b: BoolParam::new("Note B", true)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -211,13 +211,13 @@ impl KeyNoteParams {
 }
 
 pub struct MidiNote {
-    pub note: [bool; 108]
+    pub note: [bool; 96]
 }
 
 impl Default for MidiNote {
     fn default() -> Self {
-        let mut note = [false; 108];
-        for i in 0..108 {
+        let mut note = [false; 96];
+        for i in 0..96 {
             note[i] = false;
         }
         Self {
@@ -228,18 +228,18 @@ impl Default for MidiNote {
 
 impl MidiNote {
 
-    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess108>, buffer_config: &BufferConfig) {
-        let mut notes: [i8; 108] = params.note_table.i2t.load().i108;
+    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
+        let mut notes: [i8; 96] = params.note_table.i2t.load().i96;
         match params.key_note.repeat.value() {
             true => {
-                let mut note_on_keys = [false; 108];
-                let mut notes_sel: [i8; 108] = [-128; 108];
-                for i in 0..108 {
+                let mut note_on_keys = [false; 96];
+                let mut notes_sel: [i8; 96] = [-128; 96];
+                for i in 0..96 {
                     let a: u8 = i % 12;
                     match a {
-                        0 => { note_on_keys[i as usize] = params.key_note.c.value(); }
-                        1 => { note_on_keys[i as usize] = params.key_note.c_sharp.value(); }
-                        2 => { note_on_keys[i as usize] = params.key_note.d.value(); }
+                        0 => { note_on_keys[i as usize] = params.key_note.note_c.value(); }
+                        1 => { note_on_keys[i as usize] = params.key_note.note_c_sharp.value(); }
+                        2 => { note_on_keys[i as usize] = params.key_note.note_d.value(); }
                         3 => { note_on_keys[i as usize] = params.key_note.d_sharp.value(); }
                         4 => { note_on_keys[i as usize] = params.key_note.e.value(); }
                         5 => { note_on_keys[i as usize] = params.key_note.f.value(); }
@@ -258,25 +258,25 @@ impl MidiNote {
             false => {
             }
         }
-        params.note_table.i2t.store(NoteTablesArray { i108: notes});
-        AudioProcess108::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
+        params.note_table.i2t.store(NoteTablesArray { i96: notes});
+        AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
-    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess108>, buffer_config: &BufferConfig) {
-        let mut notes: [i8; 108] = params.note_table.im2t.load().i108;
+    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
+        let mut notes: [i8; 96] = params.note_table.im2t.load().i96;
         match params.key_note.repeat.value() {
             true => {
-                let mut note_on_keys = [false; 108];
+                let mut note_on_keys = [false; 96];
                 let mut note_keys = [false; 12];
-                let mut notes_sel: [i8; 108] = [-128; 108];
-                for i in 0..108 {
+                let mut notes_sel: [i8; 96] = [-128; 96];
+                for i in 0..96 {
                     let a: u8 = i % 12;
                     match self.note[i as usize] {
                         true => { note_keys[a as usize] = true; }
                         false => {}
                     }
                 }
-                for i in 0..108 {
+                for i in 0..96 {
                     let a: u8 = i % 12;
                     match a {
                         0 => { note_on_keys[i as usize] = note_keys[0]; }
@@ -298,16 +298,16 @@ impl MidiNote {
                 notes = notes_sel;
             }
             false => {
-                let mut notes_sel: [i8; 108] = [-128; 108];
+                let mut notes_sel: [i8; 96] = [-128; 96];
                 self.find_off_key(params.clone(), &self.note, &mut notes_sel);
                 notes = notes_sel;
             }
         }
-        params.note_table.im2t.store(NoteTablesArray { i108: notes});
-        AudioProcess108::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
+        params.note_table.im2t.store(NoteTablesArray { i96: notes});
+        AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
-    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 108], notes_sel: &mut [i8; 108]) {
+    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 96], notes_sel: &mut [i8; 96]) {
         for i in 0..params.key_note.find_off_key.value() {
             match params.key_note.round_up.value() {
                 true => {
@@ -319,7 +319,7 @@ impl MidiNote {
                                     notes_sel[j - i as usize] = 0;
                                     notes_sel[j - i as usize] = i as i8;
                                 }
-                                if j + i as usize <= 103 && notes_sel[j + i as usize] == -128 {
+                                if j + i as usize <= 95 && notes_sel[j + i as usize] == -128 {
                                     notes_sel[j + i as usize] = 0;
                                     notes_sel[j + i as usize] = (i * -1) as i8;
                                 }
@@ -339,7 +339,7 @@ impl MidiNote {
                                     notes_sel[j - i as usize] = 0;
                                     notes_sel[j - i as usize] = i as i8;
                                 }
-                                if j + i as usize <= 103 && notes_sel[j + i as usize] == -128 {
+                                if j + i as usize <= 95 && notes_sel[j + i as usize] == -128 {
                                     notes_sel[j + i as usize] = 0;
                                     notes_sel[j + i as usize] = (i * -1) as i8;
                                 }
@@ -354,7 +354,7 @@ impl MidiNote {
         }
     }
 
-    pub fn param_update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess108>, buffer_config: &BufferConfig) {
+    pub fn param_update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
         match params.key_note.midi.value() {
             true => self.update_midi(params, audio_process, buffer_config),
             false => self.update(params, audio_process, buffer_config),

@@ -1,4 +1,4 @@
-use crate::audio_process::AudioProcess108;
+use crate::audio_process::AudioProcess96;
 
 pub struct Delay {
     pub delay_samples: [Vec<f32>; 2],
@@ -43,6 +43,6 @@ impl Default for Delay {
     }
 }
 
-pub fn latency_average96(ap: &Vec<AudioProcess108>) -> u32 {
+pub fn latency_average96(ap: &Vec<AudioProcess96>) -> u32 {
     ap[0].get_latency()
 }

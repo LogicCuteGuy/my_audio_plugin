@@ -16,7 +16,7 @@ pub struct NoteTables {
 #[derive(Serialize, Deserialize, Clone, Copy)]
 pub struct NoteTablesArray {
     #[serde(with = "serialize")]
-    pub i108: [i8; 108]
+    pub i96: [i8; 96]
 }
 
 impl<'a> PersistentField<'a, NoteTables> for Arc<NoteTables> {
@@ -36,8 +36,8 @@ impl<'a> PersistentField<'a, NoteTables> for Arc<NoteTables> {
 impl Default for NoteTables {
     fn default() -> Self {
         Self {
-            i2t: AtomicCell::new(NoteTablesArray { i108: [0; 108] }),
-            im2t: AtomicCell::new(NoteTablesArray { i108: [0; 108] })
+            i2t: AtomicCell::new(NoteTablesArray { i96: [0; 96] }),
+            im2t: AtomicCell::new(NoteTablesArray { i96: [0; 96] })
         }
     }
 }
@@ -45,7 +45,7 @@ impl Default for NoteTables {
 pub mod serialize {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    pub fn serialize<S, T>(cell: &[T; 108], serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S, T>(cell: &[T; 96], serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
             T: Serialize + Copy,
@@ -53,12 +53,12 @@ pub mod serialize {
         cell.serialize(serializer)
     }
 
-    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<[T; 108], D::Error>
+    pub fn deserialize<'de, D, T>(deserializer: D) -> Result<[T; 96], D::Error>
         where
             D: Deserializer<'de>,
             T: Deserialize<'de> + Copy,
     {
         let result: Result<T, _> = T::deserialize(deserializer);
-        result.map(|val| [val; 108])
+        result.map(|val| [val; 96])
     }
 }
