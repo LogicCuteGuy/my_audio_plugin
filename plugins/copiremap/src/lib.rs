@@ -617,10 +617,10 @@ impl Plugin for CoPiReMapPlugin {
                                                 index = 0;
                                             }
                                             let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
-                                            if ap.note < (low_note + 12) as u8 {
+                                            if !ap.tuning.is_none() {
                                                 pitch[index] = ap.process(*sample, self.params.clone(), i, input_param);
                                             }
-                                            if input_param > db_to_gain(-60.0) && ap.note as usize >= self.params.global.low_note_off.value() as usize - 24 {
+                                            if input_param > db_to_gain(-60.0) {
                                                 audio_process += ap.process_bpf(pitch[index], self.params.clone(), i, input_param);
                                                 // println!("Work {}, {}", ii, ap.note);
                                             }

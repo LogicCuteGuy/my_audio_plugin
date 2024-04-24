@@ -160,7 +160,7 @@ impl AudioProcessParams {
 
 pub struct AudioProcess96 {
     bpf: Option<MyFilter>,
-    tuning: Option<MyPitch>,
+    pub tuning: Option<MyPitch>,
     delay: Delay,
     pub note: u8,
     pub note_pitch: i8,
