@@ -66,6 +66,15 @@ pub struct GlobalParams {
     #[id = "global_threshold"]
     pub global_threshold: FloatParam,
 
+    #[id = "global_threshold_flip"]
+    pub global_threshold_flip: BoolParam,
+
+    #[id = "global_threshold_attack"]
+    pub global_threshold_attack: FloatParam,
+
+    #[id = "global_threshold_release"]
+    pub global_threshold_release: FloatParam,
+
     #[id = "low_note_off"]
     pub low_note_off: IntParam,
 
@@ -119,6 +128,15 @@ impl GlobalParams {
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            global_threshold_flip: BoolParam::new("Global Threshold Flip", false),
+            global_threshold_attack: FloatParam::new("Global Threshold Attack", 1.0, FloatRange::Linear {
+                min: 0.1,
+                max: 5.0,
+            }).with_unit("ms.mb"),
+            global_threshold_release: FloatParam::new("Global Threshold Release", 1.0, FloatRange::Linear {
+                min: 0.1,
+                max: 5.0,
+            }).with_unit("ms.mb"),
             low_note_off: IntParam::new(
                 "Low Note Off",
                 36,
@@ -378,7 +396,7 @@ impl Default for CoPiReMapPlugin {
                 process_mode: ProcessMode::Realtime,
             },
             midi_note: MidiNote::default(),
-            audio_process96: audio_process96,
+            audio_process96,
             lpf: MyFilter::default(),
             hpf: MyFilter::default(),
             delay: Delay::default(),
@@ -601,10 +619,12 @@ impl Plugin for CoPiReMapPlugin {
                 let mut pitch: [f32; 12] = [0.0; 12];
                 let mut audio_process: f32 = 0.0;
                 for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
+                    let size = channel.len();
                     for sample in channel.iter_mut() {
                         let delay = self.delay.process(*sample, i);
-                        let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, self.params.global.global_threshold.value());
-                        if gate_on.0 {
+                        let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, &self.buffer_config, self.params.global.global_threshold.value(), self.params.global.global_threshold_attack.value(), self.params.global.global_threshold_release.value(), size);
+                        let gate1 = (gate_on.0 && !self.params.global.global_threshold_flip.value()) || (gate_on.1 && self.params.global.global_threshold_flip.value());
+                        if gate1 {
                             let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => self.lpf.process(delay, i) };
                             let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => self.hpf.process(delay, i) };
                             match self.params.audio_process.pitch_shift_12_node.value() {
@@ -637,14 +657,15 @@ impl Plugin for CoPiReMapPlugin {
                                     );
                                 }
                             }
-                            *sample = ((audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value())) * self.gate.get_param();
+                            *sample = ((audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value())) * if self.params.global.global_threshold_flip.value() {self.gate.get_param_inv()} else {self.gate.get_param()};
                             audio_process = 0.0;
                         }
-                        if gate_on.1 {
-                            *sample = (delay * self.gate.get_param_inv()) + if gate_on.0 { *sample } else { 0.0 };
+                        let gate2 = (gate_on.1 && !self.params.global.global_threshold_flip.value()) || (gate_on.0 && self.params.global.global_threshold_flip.value());
+                        if gate2 {
+                            *sample = (delay * if !self.params.global.global_threshold_flip.value() {self.gate.get_param_inv()} else {self.gate.get_param()}) + if gate1 { *sample } else { 0.0 };
                         }
                     }
-                    self.gate.update_fast(channel.len());
+                    self.gate.update_fast(size);
                 }
             }
         }

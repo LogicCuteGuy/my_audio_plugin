@@ -1,4 +1,6 @@
-
+use std::sync::Arc;
+use nih_plug::audio_setup::BufferConfig;
+use crate::PluginParams;
 
 pub struct MyGate {
     fast: f32,
@@ -15,17 +17,20 @@ impl MyGate {
         }
     }
 
-    pub fn update_fast_param(&mut self, sample: f32, param: f32) -> (bool, bool) {
+    pub fn update_fast_param(&mut self, sample: f32, buffer_config: &BufferConfig, threshold: f32, attack_ms: f32, release_ms: f32, buf_size: usize) -> (bool, bool) {
         self.sum += sample * sample;
-        if self.fast >= param && self.param >= 1.0 {
+        let delta_attack = (1.0 / (attack_ms * 0.001 * buffer_config.sample_rate * buf_size as f32)).min(1.0); // Change per sample for attack
+        let delta_release = (1.0 / (release_ms * 0.001 * buffer_config.sample_rate * buf_size as f32)).min(1.0); // Change per sample for release
+
+        if self.fast >= threshold && self.param >= 1.0 {
             (true, false)
-        } else if self.fast >= param {
-            self.param += 0.001;
+        } else if self.fast >= threshold {
+            self.param += delta_attack / 2.0; // Increase param for attack
             (true, true)
-        } else if self.fast < param && self.param <= 0.0 {
+        } else if self.fast < threshold && self.param <= 0.0 {
             (false, true)
         } else {
-            self.param -= 0.001;
+            self.param -= delta_release / 2.0; // Decrease param for release
             (true, true)
         }
     }

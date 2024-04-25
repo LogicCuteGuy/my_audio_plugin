@@ -9,6 +9,7 @@ use simple_eq::design::Curve;
 use crate::{PluginParams};
 use crate::delay::Delay;
 use crate::filter::MyFilter;
+use crate::gate::MyGate;
 use crate::hertz_calculator::{hz_cal_clh, hz_cal_tlh};
 use crate::pitch::MyPitch;
 
@@ -16,6 +17,15 @@ use crate::pitch::MyPitch;
 pub struct AudioProcessParams {
     #[id = "threshold"]
     pub threshold: FloatParam,
+
+    #[id = "threshold_flip"]
+    pub threshold_flip: BoolParam,
+
+    #[id = "threshold_attack"]
+    pub threshold_attack: FloatParam,
+
+    #[id = "threshold_release"]
+    pub threshold_release: FloatParam,
 
     #[id = "resonance"]
     pub resonance: FloatParam,
@@ -58,6 +68,15 @@ impl AudioProcessParams {
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
+            threshold_flip: BoolParam::new("Threshold Flip", false),
+            threshold_attack: FloatParam::new("Threshold Attack", 1.0, FloatRange::Linear {
+                min: 0.1,
+                max: 5.0,
+            }).with_unit("ms.mb"),
+            threshold_release: FloatParam::new("Threshold Release", 1.0, FloatRange::Linear {
+                min: 0.1,
+                max: 5.0,
+            }).with_unit("ms.mb"),
             resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 500.0 })
                 .with_callback(
                     {
@@ -162,6 +181,7 @@ pub struct AudioProcess96 {
     bpf: Option<MyFilter>,
     pub tuning: Option<MyPitch>,
     delay: Delay,
+    gate: MyGate,
     pub note: u8,
     pub note_pitch: i8,
 }
@@ -364,6 +384,7 @@ impl Default for AudioProcess96 {
             bpf: None,
             tuning: None,
             delay: Delay::default(),
+            gate: MyGate::new(),
             note: 0,
             note_pitch: 0,
         }
