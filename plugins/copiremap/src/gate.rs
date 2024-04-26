@@ -6,6 +6,7 @@ pub struct MyGate {
     fast: f32,
     sum: f32,
     param: f32,
+    count: u16
 }
 
 impl MyGate {
@@ -14,6 +15,7 @@ impl MyGate {
             fast: 0.0,
             sum: 0.0,
             param: 0.0,
+            count: 0,
         }
     }
 
@@ -21,7 +23,12 @@ impl MyGate {
         self.sum += sample * sample;
         let delta_attack = (1.0 / (attack_ms * 0.001 * buffer_config.sample_rate * buf_size as f32)).min(1.0); // Change per sample for attack
         let delta_release = (1.0 / (release_ms * 0.001 * buffer_config.sample_rate * buf_size as f32)).min(1.0); // Change per sample for release
-
+        self.count += 1;
+        if self.count > buf_size as u16 {
+            self.count = 0;
+            self.fast = (self.sum / buf_size as f32).sqrt();
+            self.sum = 0.0;
+        }
         if self.fast >= threshold && self.param >= 1.0 {
             (true, false)
         } else if self.fast >= threshold {
@@ -41,10 +48,5 @@ impl MyGate {
 
     pub fn get_param_inv(&self) -> f32 {
         1.0 - self.param
-    }
-
-    pub fn update_fast(&mut self, samples: usize) {
-        self.fast = (self.sum / samples as f32).sqrt();
-        self.sum = 0.0;
     }
 }

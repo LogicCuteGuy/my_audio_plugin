@@ -70,14 +70,12 @@ impl PitchShifter {
         let ffft_scratch_len = forward_fft.get_scratch_len();
         let ifft_scratch_len = inverse_fft.get_scratch_len();
         let scratch_len = ffft_scratch_len.max(ifft_scratch_len);
-
         let mut windowing = vec![0.0; frame_size as usize];
         for k in 0..frame_size {
             windowing[k as usize] = -0.5 * (TAU * (k as f32) / fs_real as f32).cos() + 0.5;
         }
 
         //pitch
-        let shift = shift;
         let fs_real = frame_size as f32;
         let half_frame_size = (frame_size / 2) + 1;
 

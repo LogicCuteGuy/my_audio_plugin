@@ -30,9 +30,6 @@ pub struct AudioProcessParams {
     #[id = "resonance"]
     pub resonance: FloatParam,
 
-    #[id = "fft_mode"]
-    pub fft_mode: BoolParam,
-
     #[id = "pitch_shift"]
     pub pitch_shift: BoolParam,
 
@@ -62,13 +59,13 @@ impl AudioProcessParams {
                 "Threshold",
                 db_to_gain(0.0),
                 FloatRange::Linear {
-                    min: db_to_gain(-60.0),
+                    min: db_to_gain(-100.0),
                     max: db_to_gain(0.0),
                 },
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            threshold_flip: BoolParam::new("Threshold Flip", false),
+            threshold_flip: BoolParam::new("Threshold Flip", true),
             threshold_attack: FloatParam::new("Threshold Attack", 1.0, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
@@ -86,13 +83,6 @@ impl AudioProcessParams {
                         })
                     }
                 ),
-            fft_mode: BoolParam::new(
-                "FFT Mode",
-                false,
-            ).with_callback({
-                Arc::new(move |_| {
-                })
-            }),
             pitch_shift: BoolParam::new(
                 "Pitch Shift",
                 true,
@@ -178,10 +168,11 @@ impl AudioProcessParams {
 }
 
 pub struct AudioProcess96 {
-    bpf: Option<MyFilter>,
+    bpf: MyFilter,
     pub tuning: Option<MyPitch>,
     delay: Delay,
-    gate: MyGate,
+    pub(crate) gate: MyGate,
+    open: (bool, bool),
     pub note: u8,
     pub note_pitch: i8,
 }
@@ -195,13 +186,7 @@ impl AudioProcess96 {
             None => {
             }
         }
-        match self.bpf.as_mut() {
-            Some(value) => {
-                value.reset()
-            }
-            None => {
-            }
-        }
+        self.bpf.reset();
         self.delay.reset();
     }
 
@@ -236,15 +221,7 @@ impl AudioProcess96 {
         if !params.audio_process.pitch_shift_12_node.value() {
             self.tuning = Some(MyPitch::set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz));
         }
-        match params.audio_process.fft_mode.value() {
-            true => {
-                self.bpf = None;
-            }
-            false => {
-                self.bpf = Some(MyFilter::default());
-                self.bpf.as_mut().unwrap().set(Curve::Bandpass, bandpass, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
-            }
-        }
+        self.bpf.set(Curve::Bandpass, bandpass, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
         self.note = note;
     }
 
@@ -268,13 +245,7 @@ impl AudioProcess96 {
         let mut bandpass: f32 = 0.0;
         let mut pitch_tune_hz: f32 = 0.0;
         hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value(), !params.audio_process.pitch_shift.value());
-        match self.bpf.as_mut() {
-            Some(value) => {
-                value.set(Curve::Bandpass, bandpass, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
-            }
-            None => {
-            }
-        }
+        self.bpf.set(Curve::Bandpass, bandpass, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
         self.note_pitch = note_pitch;
         match self.tuning.as_mut() {
             Some(value) => {
@@ -307,18 +278,11 @@ impl AudioProcess96 {
         let note_pitch: i8 = params.note_table.i2t.load().i96[self.note as usize];
         let mut center_hz: f32 = 0.0;
         hz_cal_clh(self.note, note_pitch, &mut center_hz, params.global.hz_center.value(), !params.audio_process.pitch_shift.value());
-        match self.bpf.as_mut() {
-            Some(value) => {
-                value.set(Curve::Bandpass, center_hz, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
-            }
-            None => {
-            }
-        }
+        self.bpf.set(Curve::Bandpass, center_hz, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
     }
 
-    pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32) -> f32 {
-        let threshold: bool = input >= params.audio_process.threshold.value();
-        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) {
+    pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32, buffer_config: &BufferConfig, buf_size: usize) -> f32 {
+        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !(!((self.open.0 && !params.audio_process.threshold_flip.value()) || (self.open.1 && params.audio_process.threshold_flip.value())) && !params.audio_process.pitch_shift_12_node.value()) {
             true => match self.tuning.as_mut() {
                 None => {
                     0.0
@@ -341,33 +305,20 @@ impl AudioProcess96 {
                 pitch
             }
             false => {
-                match params.audio_process.fft_mode.value() {
-                    true => {
-                        pitch
-                    }
-                    false => {
-                        if input_param > db_to_gain(-60.0) {
-                            self.process_bpf(pitch, params, audio_id, input_param)
-                        } else {
-                            0.0
-                        }
-                    }
+                if input_param > db_to_gain(-60.0) {
+                    self.process_bpf(pitch, audio_id, input_param, params.clone())
+                } else {
+                    0.0
                 }
             }
         };
+        self.open = self.gate.update_fast_param(bpf, buffer_config, params.audio_process.threshold.value(), params.audio_process.threshold_attack.value(), params.audio_process.threshold_release.value(), buf_size);
         // output = if self.note_pitch == -128 { 0.0 } else { output };
-        bpf
+        bpf * if !params.audio_process.threshold_flip.value() {self.gate.get_param()} else {self.gate.get_param_inv()}
     }
 
-    pub fn process_bpf(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32) -> f32 {
-        match params.audio_process.fft_mode.value() {
-            true => {
-                input * input_param
-            }
-            false => {
-                self.bpf.as_mut().unwrap().process(input, audio_id) * input_param
-            }
-        }
+    pub fn process_bpf(&mut self, input: f32, audio_id: usize, input_param: f32, params: Arc<PluginParams>) -> f32 {
+        if !(self.note_pitch == -128 && params.key_note.mute_off_key.value()) {self.bpf.process(input, audio_id) * input_param } else { 0.0 }
     }
 
     pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig, note_pitch: [i8; 96]) {
@@ -381,10 +332,11 @@ impl AudioProcess96 {
 impl Default for AudioProcess96 {
     fn default() -> Self {
         Self {
-            bpf: None,
+            bpf: MyFilter::default(),
             tuning: None,
             delay: Delay::default(),
             gate: MyGate::new(),
+            open: (false, false),
             note: 0,
             note_pitch: 0,
         }
