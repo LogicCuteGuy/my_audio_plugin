@@ -21,11 +21,11 @@ pub struct KeyNoteParams {
     #[id = "mute_off_key"]
     pub mute_off_key: BoolParam,
 
-    #[id = "round_up"]
-    pub round_up: BoolParam,
-
     #[id = "table_to_midi"]
     pub table_to_midi: BoolParam,
+
+    #[id = "round_up"]
+    pub round_up: BoolParam,
 
     #[id = "note_c"]
     pub note_c: BoolParam,
@@ -39,8 +39,8 @@ pub struct KeyNoteParams {
     #[id = "note_d_sharp"]
     pub note_d_sharp: BoolParam,
 
-    #[id = "e"]
-    pub e: BoolParam,
+    #[id = "note_e"]
+    pub note_e: BoolParam,
 
     #[id = "f"]
     pub f: BoolParam,
@@ -65,7 +65,7 @@ pub struct KeyNoteParams {
 }
 
 impl KeyNoteParams {
-    pub fn new(update_key_note: Arc<AtomicBool>) -> Self {
+    pub fn new(update_key_note: Arc<AtomicBool>, update_key_note_12: Arc<AtomicBool>) -> Self {
 
         Self {
             midi: BoolParam::new("Midi", false)
@@ -117,108 +117,108 @@ impl KeyNoteParams {
             note_c: BoolParam::new("Note C", false)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             note_c_sharp: BoolParam::new("Note C#", false)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             note_d: BoolParam::new("Note D", true)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             note_d_sharp: BoolParam::new("Note D#", false)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
-            e: BoolParam::new("Note E", true)
+            note_e: BoolParam::new("Note E", true)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             f: BoolParam::new("Note F", false)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             f_sharp: BoolParam::new("Note F#", true)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             g: BoolParam::new("Note G", true)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             g_sharp: BoolParam::new("Note G#", false)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             a: BoolParam::new("Note A", true)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             a_sharp: BoolParam::new("Note A#", false)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
             b: BoolParam::new("Note B", true)
                 .with_callback(
                 {
-                    let update_key_note = update_key_note.clone();
+                    let update_key_note_12 = update_key_note_12.clone();
                     Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
+                        update_key_note_12.store(true, Ordering::Release);
                     })
                 }
             ),
@@ -232,19 +232,15 @@ pub struct MidiNote {
 
 impl Default for MidiNote {
     fn default() -> Self {
-        let mut note = [false; 96];
-        for i in 0..96 {
-            note[i] = false;
-        }
         Self {
-            note
+            note: [false; 96]
         }
     }
 }
 
 impl MidiNote {
 
-    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
+    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
         let mut notes: [i8; 96] = params.note_table.i2t.load().i96;
         match params.key_note.repeat.value() {
             true => {
@@ -257,7 +253,7 @@ impl MidiNote {
                         1 => { note_on_keys[i as usize] = params.key_note.note_c_sharp.value(); }
                         2 => { note_on_keys[i as usize] = params.key_note.note_d.value(); }
                         3 => { note_on_keys[i as usize] = params.key_note.note_d_sharp.value(); }
-                        4 => { note_on_keys[i as usize] = params.key_note.e.value(); }
+                        4 => { note_on_keys[i as usize] = params.key_note.note_e.value(); }
                         5 => { note_on_keys[i as usize] = params.key_note.f.value(); }
                         6 => { note_on_keys[i as usize] = params.key_note.f_sharp.value(); }
                         7 => { note_on_keys[i as usize] = params.key_note.g.value(); }
@@ -275,10 +271,12 @@ impl MidiNote {
             }
         }
         params.note_table.i2t.store(NoteTablesArray { i96: notes});
-        AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
+        if !params.key_note.midi.value() {
+            AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
+        }
     }
 
-    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
+    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
         let mut notes: [i8; 96] = params.note_table.im2t.load().i96;
         let notes2: [i8; 96] = params.note_table.i2t.load().i96;
         match params.key_note.repeat.value() {
@@ -346,7 +344,7 @@ impl MidiNote {
                                         notes_sel[j + i as usize] = table[j + i as usize];
                                     } else {
                                         notes_sel[j + i as usize] = 0;
-                                        notes_sel[j + i as usize] = (i * -1) as i8;
+                                        notes_sel[j + i as usize] = -i as i8;
                                     }
                                     
                                 }
@@ -368,7 +366,7 @@ impl MidiNote {
                                 }
                                 if j + i as usize <= 95 && notes_sel[j + i as usize] == -128 {
                                     notes_sel[j + i as usize] = 0;
-                                    notes_sel[j + i as usize] = (i * -1) as i8;
+                                    notes_sel[j + i as usize] = -i as i8;
                                 }
                             }
                             false => {

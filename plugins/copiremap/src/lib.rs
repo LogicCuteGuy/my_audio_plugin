@@ -250,7 +250,7 @@ impl PluginComponent {
     }
 
     fn convert_parameter(&self, id: &str) -> PluginParameter {
-        let param_ptr = self.param_map.get(id.into()).unwrap();
+        let param_ptr = self.param_map.get(id).unwrap();
 
         let value = unsafe { param_ptr.unmodulated_normalized_value() };
         let default_value = unsafe { param_ptr.default_normalized_value() };
@@ -326,15 +326,15 @@ impl PluginComponentHandle for PluginComponent {
 
 impl PluginComponentHandleParameterEvents for PluginComponent {
     fn on_start_parameter_change(&self, mut f: impl FnMut(SharedString) + 'static) {
-        self.component.on_start_change(move |parameter| f(parameter.id.into()));
+        self.component.on_start_change(move |parameter| f(parameter.id));
     }
 
     fn on_parameter_changed(&self, mut f: impl FnMut(SharedString, f32) + 'static) {
-        self.component.on_changed(move |parameter, value| f(parameter.id.into(), value));
+        self.component.on_changed(move |parameter, value| f(parameter.id, value));
     }
 
     fn on_end_parameter_change(&self, mut f: impl FnMut(SharedString) + 'static) {
-        self.component.on_end_change(move |parameter| f(parameter.id.into()));
+        self.component.on_end_change(move |parameter| f(parameter.id));
     }
 
     fn on_set_parameter_string(&self, mut f: impl FnMut(SharedString, SharedString) + 'static) {
@@ -362,6 +362,7 @@ pub struct CoPiReMapPlugin {
     set_pitch_shift_12_node: Arc<AtomicBool>,
 
     update_key_note: Arc<AtomicBool>,
+    update_key_note_12: Arc<AtomicBool>,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -376,6 +377,7 @@ impl Default for CoPiReMapPlugin {
         let set_pitch_shift_12_node = Arc::new(AtomicBool::new(false));
 
         let update_key_note = Arc::new(AtomicBool::new(false));
+        let update_key_note_12 = Arc::new(AtomicBool::new(false));
 
         let mut audio_process96 = Vec::with_capacity(96);
         for _ in 0..96 {
@@ -387,7 +389,7 @@ impl Default for CoPiReMapPlugin {
                 note_table: Arc::new(NoteTables::default()),
                 global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone())),
                 audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone(), update_pitch_shift_and_after_bandpass.clone(), update_bpf_center_hz.clone(), set_pitch_shift_12_node.clone())),
-                key_note: Arc::new(KeyNoteParams::new(update_key_note.clone())),
+                key_note: Arc::new(KeyNoteParams::new(update_key_note.clone(), update_key_note_12.clone())),
             }),
             buffer_config: BufferConfig {
                 sample_rate: 1.0,
@@ -408,7 +410,8 @@ impl Default for CoPiReMapPlugin {
             update_pitch_shift_window_duration_ms,
             update_bpf_center_hz,
             set_pitch_shift_12_node,
-            update_key_note
+            update_key_note,
+            update_key_note_12
         }
     }
 }
@@ -586,6 +589,13 @@ impl Plugin for CoPiReMapPlugin {
                 {
                     self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config);
                 }
+                if self
+                    .update_key_note_12
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    self.midi_note.update(self.params.clone(), &mut self.audio_process96, &self.buffer_config);
+                }
                 while let Some(event) = context.next_event() {
                     match event {
                         NoteEvent::NoteOn {
@@ -638,7 +648,7 @@ impl Plugin for CoPiReMapPlugin {
                                                 index = 0;
                                             }
                                             let input_param: f32 = if ap.note_pitch == 0 { self.params.audio_process.in_key_gain.value() } else if ap.note_pitch == -128 { self.params.audio_process.off_key_gain.value() } else if !self.params.audio_process.pitch_shift.value() { self.params.audio_process.off_key_gain.value() } else { self.params.audio_process.tuning_gain.value() };
-                                            if !ap.tuning.is_none() {
+                                            if ap.tuning.is_some() {
                                                 pitch[index] = ap.process(*sample, self.params.clone(), i, input_param, &self.buffer_config, size);
                                             }
                                             if input_param > db_to_gain(-60.0) {

@@ -25,9 +25,9 @@ impl MyFilter {
         self.filter[1].set_frequency(freq_hz);
     }
 
-    pub fn set_gain(&mut self, gain_dB: f32) {
-        self.filter[0].set_gain(gain_dB);
-        self.filter[1].set_gain(gain_dB);
+    pub fn set_gain(&mut self, gain_d_b: f32) {
+        self.filter[0].set_gain(gain_d_b);
+        self.filter[1].set_gain(gain_d_b);
     }
 
     pub fn set_resonance(&mut self, resonance: f32) {

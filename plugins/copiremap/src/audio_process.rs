@@ -179,12 +179,8 @@ pub struct AudioProcess96 {
 
 impl AudioProcess96 {
     pub fn reset(&mut self) {
-        match self.tuning.as_mut() {
-            Some(value) => {
-                value.reset()
-            }
-            None => {
-            }
+        if let Some(value) = self.tuning.as_mut() {
+            value.reset()
         }
         self.bpf.reset();
         self.delay.reset();
@@ -247,12 +243,8 @@ impl AudioProcess96 {
         hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value(), !params.audio_process.pitch_shift.value());
         self.bpf.set(Curve::Bandpass, bandpass, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
         self.note_pitch = note_pitch;
-        match self.tuning.as_mut() {
-            Some(value) => {
-                value.set_pitch(pitch_tune_hz);
-            }
-            None => {
-            }
+        if let Some(value) = self.tuning.as_mut() {
+            value.set_pitch(pitch_tune_hz);
         }
     }
 
@@ -282,7 +274,7 @@ impl AudioProcess96 {
     }
 
     pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32, buffer_config: &BufferConfig, buf_size: usize) -> f32 {
-        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !(!((self.open.0 && !params.audio_process.threshold_flip.value()) || (self.open.1 && params.audio_process.threshold_flip.value())) && !params.audio_process.pitch_shift_12_node.value()) {
+        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !!(params.audio_process.pitch_shift_12_node.value() || self.open.0 && !params.audio_process.threshold_flip.value() || self.open.1 && params.audio_process.threshold_flip.value()) {
             true => match self.tuning.as_mut() {
                 None => {
                     0.0
@@ -321,7 +313,7 @@ impl AudioProcess96 {
         if !(self.note_pitch == -128 && params.key_note.mute_off_key.value()) {self.bpf.process(input, audio_id) * input_param } else { 0.0 }
     }
 
-    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig, note_pitch: [i8; 96]) {
+    pub fn fn_update_pitch_shift_and_after_bandpass(params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig, note_pitch: [i8; 96]) {
         for (i, ap) in audio_process.iter_mut().enumerate() {
             ap.set_pitch_shift_and_after_bandpass(params.clone(), note_pitch[i], buffer_config);
         }

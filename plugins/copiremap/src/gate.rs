@@ -1,6 +1,4 @@
-use std::sync::Arc;
 use nih_plug::audio_setup::BufferConfig;
-use crate::PluginParams;
 
 pub struct MyGate {
     fast: f32,
