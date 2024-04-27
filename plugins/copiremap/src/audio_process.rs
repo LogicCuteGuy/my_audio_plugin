@@ -39,6 +39,9 @@ pub struct AudioProcessParams {
     #[id = "pitch_shift_over_sampling"]
     pub pitch_shift_over_sampling: IntParam,
 
+    #[id = "pitch_shift_window_duration_ms"]
+    pub pitch_shift_window_duration_ms: IntParam,
+    
     #[id = "in_key_gain"]
     pub in_key_gain: FloatParam,
 
@@ -48,8 +51,6 @@ pub struct AudioProcessParams {
     #[id = "off_key_gain"]
     pub off_key_gain: FloatParam,
 
-    #[id = "pitch_shift_window_duration_ms"]
-    pub pitch_shift_window_duration_ms: IntParam
 }
 
 impl AudioProcessParams {
@@ -94,7 +95,7 @@ impl AudioProcessParams {
             }),
             pitch_shift_12_node: BoolParam::new(
                 "Pitch Shift 12 Node",
-                false,
+                true,
             ).with_callback({
                 let set_pitch_shift_12_node = set_pitch_shift_12_node.clone();
                 Arc::new(move |_| {
@@ -115,6 +116,21 @@ impl AudioProcessParams {
                     })
                 }
             ),
+            pitch_shift_window_duration_ms: IntParam::new(
+                "Pitch Shift Window Duration",
+                7,
+                IntRange::Linear {
+                    min: 1,
+                    max: 100,
+                }
+            ).with_unit("ms")
+                .with_callback(
+                    {
+                        Arc::new(move |_| {
+                            update_pitch_shift_window_duration_ms.store(true, Ordering::Release);
+                        })
+                    }
+                ),
             in_key_gain: FloatParam::new(
                 "In Key Gain",
                 db_to_gain(0.0),
@@ -148,21 +164,6 @@ impl AudioProcessParams {
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            pitch_shift_window_duration_ms: IntParam::new(
-                "Pitch Shift Window Duration",
-                7,
-                IntRange::Linear {
-                    min: 1,
-                    max: 100,
-                }
-            ).with_unit("ms")
-                .with_callback(
-                {
-                    Arc::new(move |_| {
-                        update_pitch_shift_window_duration_ms.store(true, Ordering::Release);
-                    })
-                }
-            ),
         }
     }
 }

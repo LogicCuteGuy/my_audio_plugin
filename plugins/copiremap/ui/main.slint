@@ -9,10 +9,10 @@ export component PluginWindow {
     in-out property <length> drag-x;
     in-out property <length> drag-y;
     
-    out property <length> drop-area-x: drop-area.x;
-    out property <length> drop-area-y: drop-area.y;
-    out property <length> drop-area-width: drop-area.width;
-    out property <length> drop-area-height: drop-area.height;
+    // out property <length> drop-area-x: drop-area.x;
+    // out property <length> drop-area-y: drop-area.y;
+    // out property <length> drop-area-width: drop-area.width;
+    // out property <length> drop-area-height: drop-area.height;
 
     callback start-change(PluginParameter);
     callback changed(PluginParameter, float);
@@ -31,29 +31,29 @@ export component PluginWindow {
             }
         }
 
-        drop-area := Rectangle {
-            background: red;
-            width: 100px;
-            height: 100px;
+        // drop-area := Rectangle {
+        //     background: red;
+        //     width: 100px;
+        //     height: 100px;
 
-            x: 350px + sin(mod(animation-tick(), 5s) / 5s * 360deg) * 350px;
-            y: 100px;
+        //     x: 350px + sin(mod(animation-tick(), 5s) / 5s * 360deg) * 350px;
+        //     y: 100px;
 
-            states [
-                dropping when dragging &&
-                    drag-x >= self.x &&
-                    drag-x <= self.x + self.width &&
-                    drag-y >= self.y &&
-                    drag-y <= self.y + self.height:
-                {
-                    background: blue;                    
-                }
-            ]
+        //     states [
+        //         dropping when dragging &&
+        //             drag-x >= self.x &&
+        //             drag-x <= self.x + self.width &&
+        //             drag-y >= self.y &&
+        //             drag-y <= self.y + self.height:
+        //         {
+        //             background: blue;                    
+        //         }
+        //     ]
 
-            TouchArea {
-                mouse-cursor: pointer;
-            }
-        }
+        //     TouchArea {
+        //         mouse-cursor: pointer;
+        //     }
+        // }
 
         HorizontalLayout {
             width: 300px;

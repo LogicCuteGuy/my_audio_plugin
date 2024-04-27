@@ -13,6 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use nih_plug::util::db_to_gain;
 use nih_plug::{nih_export_clap, nih_export_vst3};
+use nih_plug::params::persist::PersistentField;
 use nih_plug::prelude::*;
 use nih_plug_slint::plugin_component_handle::{PluginComponentHandle, PluginComponentHandleParameterEvents};
 use nih_plug_slint::{WindowAttributes, editor::SlintEditor};
@@ -195,12 +196,8 @@ impl GlobalParams {
                 .with_string_to_value(formatters::s2v_f32_hz_then_khz())
                 .with_callback(
                 {
-                    let update_lowpass = update_lowpass.clone();
-                    let update_highpass = update_highpass.clone();
                     let update_pitch_shift_and_after_bandpass = update_pitch_shift_and_after_bandpass.clone();
                     Arc::new(move |_| {
-                        update_lowpass.store(true, Ordering::Release);
-                        update_highpass.store(true, Ordering::Release);
                         update_pitch_shift_and_after_bandpass.store(true, Ordering::Release);
                     })
                 }
@@ -229,25 +226,25 @@ impl PluginComponent {
         }
     }
 
-    fn drag_event_response(&self, position: &LogicalPosition) -> EventResponse {
-        self.component.set_drag_x(position.x as f32);
-        self.component.set_drag_y(position.y as f32);
+    // fn drag_event_response(&self, position: &LogicalPosition) -> EventResponse {
+    //     self.component.set_drag_x(position.x as f32);
+    //     self.component.set_drag_y(position.y as f32);
 
-        let drop_area_x = self.component.get_drop_area_x() as f64;
-        let drop_area_y = self.component.get_drop_area_y() as f64;
-        let drop_area_width = self.component.get_drop_area_width() as f64;
-        let drop_area_height = self.component.get_drop_area_height() as f64;
+    //     let drop_area_x = self.component.get_drop_area_x() as f64;
+    //     let drop_area_y = self.component.get_drop_area_y() as f64;
+    //     let drop_area_width = self.component.get_drop_area_width() as f64;
+    //     let drop_area_height = self.component.get_drop_area_height() as f64;
 
-        if position.x >= drop_area_x &&
-            position.x <= drop_area_x + drop_area_width &&
-            position.y >= drop_area_y &&
-            position.y <= drop_area_y + drop_area_height
-        {
-            EventResponse::DropAccepted(DropOperation::Copy)
-        } else {
-            EventResponse::Ignored
-        }
-    }
+    //     if position.x >= drop_area_x &&
+    //         position.x <= drop_area_x + drop_area_width &&
+    //         position.y >= drop_area_y &&
+    //         position.y <= drop_area_y + drop_area_height
+    //     {
+    //         EventResponse::DropAccepted(DropOperation::Copy)
+    //     } else {
+    //         EventResponse::Ignored
+    //     }
+    // }
 
     fn convert_parameter(&self, id: &str) -> PluginParameter {
         let param_ptr = self.param_map.get(id).unwrap();
@@ -338,7 +335,7 @@ impl PluginComponentHandleParameterEvents for PluginComponent {
     }
 
     fn on_set_parameter_string(&self, mut f: impl FnMut(SharedString, SharedString) + 'static) {
-        self.component.on_set_string(move |parameter, string| f(parameter.id.into(), string));
+        self.component.on_set_string(move |parameter, string| f(parameter.id, string));
     }
 }
 
@@ -536,15 +533,6 @@ impl Plugin for CoPiReMapPlugin {
                     self.hpf.set_frequency(highpass);
                 }
                 if self
-                    .update_bpf_center_hz
-                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_ok()
-                {
-                    for ap in self.audio_process96.iter_mut() {
-                        ap.set_bpf_center_hz(self.params.clone(), &self.buffer_config);
-                    }
-                }
-                if self
                     .update_pitch_shift_and_after_bandpass
                     .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
                     .is_ok()
@@ -553,7 +541,16 @@ impl Plugin for CoPiReMapPlugin {
                         true => self.params.note_table.im2t.load().i96,
                         false => self.params.note_table.i2t.load().i96,
                     };
+                    self.update_bpf_center_hz.set(false);
                     AudioProcess96::fn_update_pitch_shift_and_after_bandpass(self.params.clone(), &mut self.audio_process96, &self.buffer_config, note_table);
+                }
+                if self
+                    .update_bpf_center_hz
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok() {
+                    for ap in self.audio_process96.iter_mut() {
+                        ap.set_bpf_center_hz(self.params.clone(), &self.buffer_config);
+                    }
                 }
                 if self
                     .update_pitch_shift_over_sampling
@@ -599,11 +596,11 @@ impl Plugin for CoPiReMapPlugin {
                 while let Some(event) = context.next_event() {
                     match event {
                         NoteEvent::NoteOn {
-                            timing,
-                            voice_id,
-                            channel,
+                            timing: _timing,
+                            voice_id: _voice_id,
+                            channel: _channel,
                             note,
-                            velocity,
+                            velocity: _velocity,
                         } => if note >= 24 || note <= 119 {
                             self.midi_note.note[note as usize - 12] = true;
                             match self.params.key_note.midi.value() {
@@ -612,11 +609,11 @@ impl Plugin for CoPiReMapPlugin {
                             }
                         },
                         NoteEvent::NoteOff {
-                            timing,
-                            voice_id,
-                            channel,
+                            timing: _timing,
+                            voice_id: _voice_id,
+                            channel: _channel,
                             note,
-                            velocity,
+                            velocity: _velocity,
                         } => if note >= 24 || note <= 119 {
                             self.midi_note.note[note as usize - 12] = false;
                             match self.params.key_note.midi.value() {

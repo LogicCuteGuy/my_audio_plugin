@@ -11,6 +11,7 @@ impl MyFilter {
         self.filter[0].set(curve, frequency, resonance, gain, sample_rate);
         self.filter[1].set(curve, frequency, resonance, gain, sample_rate);
     }
+    
     pub fn get_design(&self) -> [Design<f32>; 2] {
         [self.filter[0].get_design(), self.filter[1].get_design()]
     }

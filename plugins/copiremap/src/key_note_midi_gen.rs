@@ -361,12 +361,20 @@ impl MidiNote {
                             true => {
                                 notes_sel[j] = 0;
                                 if j as i8 - i as i8 > -1 && notes_sel[j - i as usize] == -128 {
-                                    notes_sel[j - i as usize] = 0;
-                                    notes_sel[j - i as usize] = i as i8;
+                                    if params.key_note.table_to_midi.value() && params.key_note.midi.value() {
+                                        notes_sel[j - i as usize] = table[j - i as usize];
+                                    } else {
+                                        notes_sel[j - i as usize] = 0;
+                                        notes_sel[j - i as usize] = i as i8;
+                                    }
                                 }
                                 if j + i as usize <= 95 && notes_sel[j + i as usize] == -128 {
-                                    notes_sel[j + i as usize] = 0;
-                                    notes_sel[j + i as usize] = -i as i8;
+                                    if params.key_note.table_to_midi.value() && params.key_note.midi.value() {
+                                        notes_sel[j + i as usize] = table[j + i as usize];
+                                    } else {
+                                        notes_sel[j + i as usize] = 0;
+                                        notes_sel[j + i as usize] = -i as i8;
+                                    }
                                 }
                             }
                             false => {
