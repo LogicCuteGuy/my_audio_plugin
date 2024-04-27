@@ -2,30 +2,39 @@ import { VerticalBox } from "std-widgets.slint";
 import { PluginParameter } from "parameter.slint";
 
 export component ParameterSlider inherits Rectangle {
-    in-out property<PluginParameter> parameter;
-
+    in-out property <PluginParameter> parameter;
     property <bool> changing;
-
     callback start-change();
     callback changed(float);
     callback end-change();
     callback set-string(string);
-
+    in-out property <string> text;
     min-height: 24px;
     min-width: 100px;
     horizontal-stretch: 1;
     vertical-stretch: 0;
-
-    border-radius: root.height/2;
-    background: touch.pressed ? #eee: #ddd;
-    border-width: 1px;
+    
     border-color: root.background.darker(25%);
-
-    function start-editing() {
+    function start-editing(){
         edit-field.visible = true;
         edit-text-field.text = root.parameter.display-value;
         edit-text-field.focus();
         edit-text-field.select-all();
+    }
+    
+
+    texr := Rectangle {
+        Text {
+            text: " " + text + " ";
+            color: white;
+        }
+    }
+
+    Rectangle {
+        border-radius: root.height / 2;
+        background: touch.pressed ? #eee : #ddd;
+        border-width: 1px;
+        y: 25px;
     }
 
     modulation := Rectangle {
@@ -35,26 +44,27 @@ export component ParameterSlider inherits Rectangle {
         background: handle.background.with-alpha(25%);
         border-color: self.background.darker(15%);
         x: (root.width - self.width) * root.parameter.modulated-value;
+        y: 25px;
     }
 
     handle := Rectangle {
         width: self.height;
         height: parent.height;
+        y: 25px;
         border-width: 3px;
         border-radius: self.height / 2;
-        background: touch.pressed ? #f8f: touch.has-hover ? #66f : #0000ff;
+        background: touch.pressed ? #d9ff4f : touch.has-hover ? #001c99 : #2f2fef;
         border-color: self.background.darker(15%);
         x: (root.width - self.width) * root.parameter.value;
     }
 
     value-field := Rectangle {
-        width: 60px;
-        height: 20px;
-        x: handle.x + handle.width / 2 - self.width / 2;
-        y: handle.y + handle.height + 10px;
+        width: parent.width;
+        height: 15px;
+        x: 0;
+        y: 50px;
         background: white.transparentize(25%);
-        border-radius: 5px;
-
+        border-radius: 10px;
         Text {
             text: root.parameter.display-value;
             font-size: 15px;
@@ -63,42 +73,40 @@ export component ParameterSlider inherits Rectangle {
         }
 
         TouchArea {
-            clicked => { start-editing(); }
+            clicked => {
+                start-editing();
+            }
         }
 
         edit-field := Rectangle {
             background: white;
-            border-radius: 5px;
+            border-radius: 10px;
             visible: false;
-
             edit-text-field := TextInput {
                 font-size: 15px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
                 single-line: true;
-
                 accepted() => {
                     edit-field.visible = false;
                     root.set-string(self.text);
                 }
             }
-        } 
+        }
     }
 
     touch := TouchArea {
+        y: 25px;
         property <float> pressed-value;
-
         double-clicked => {
             root.changed(root.parameter.default-value);
         }
-
         pointer-event(event) => {
             if (event.button == PointerEventButton.left) {
                 if (event.kind == PointerEventKind.down) {
                     self.pressed-value = root.parameter.value;
                     root.start-change();
                     root.changing = true;
-
                     if (event.modifiers.control || event.modifiers.meta) {
                         start-editing();
                     }
@@ -107,7 +115,6 @@ export component ParameterSlider inherits Rectangle {
                     root.changing = false;
                 }
             }
-
             if (root.changing && event.kind == PointerEventKind.cancel) {
                 root.end-change();
                 root.changing = false;

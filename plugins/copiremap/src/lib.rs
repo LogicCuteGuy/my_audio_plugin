@@ -226,26 +226,6 @@ impl PluginComponent {
         }
     }
 
-    // fn drag_event_response(&self, position: &LogicalPosition) -> EventResponse {
-    //     self.component.set_drag_x(position.x as f32);
-    //     self.component.set_drag_y(position.y as f32);
-
-    //     let drop_area_x = self.component.get_drop_area_x() as f64;
-    //     let drop_area_y = self.component.get_drop_area_y() as f64;
-    //     let drop_area_width = self.component.get_drop_area_width() as f64;
-    //     let drop_area_height = self.component.get_drop_area_height() as f64;
-
-    //     if position.x >= drop_area_x &&
-    //         position.x <= drop_area_x + drop_area_width &&
-    //         position.y >= drop_area_y &&
-    //         position.y <= drop_area_y + drop_area_height
-    //     {
-    //         EventResponse::DropAccepted(DropOperation::Copy)
-    //     } else {
-    //         EventResponse::Ignored
-    //     }
-    // }
-
     fn convert_parameter(&self, id: &str) -> PluginParameter {
         let param_ptr = self.param_map.get(id).unwrap();
 
@@ -265,7 +245,7 @@ impl PluginComponent {
 
     fn set_parameter(&self, id: &str, parameter: PluginParameter) {
         match id {
-            "bypass" => self.component.set_gain(parameter),
+            "midi" => self.component.set_gain(parameter),
             _ => (),
         }
     }
@@ -280,29 +260,8 @@ impl PluginComponentHandle for PluginComponent {
         &self.param_map
     }
 
-    fn on_event(&self, event: &Event) -> EventResponse {
-        match event {
-            Event::DragEntered { position, data: _ } => {
-                self.component.set_dragging(true);
-                self.drag_event_response(position)
-            },
-
-            Event::DragExited => {
-                self.component.set_dragging(false);
-                EventResponse::Handled
-            },
-
-            Event::DragMoved { position, data: _ } => {
-                self.drag_event_response(position)
-            },
-
-            Event::DragDropped { position, data: _ } => {
-                self.component.set_dragging(false);
-                self.drag_event_response(position)
-            },
-
-            _ => EventResponse::Ignored,
-        }
+    fn on_event(&self, _event: &Event) -> EventResponse {
+        EventResponse::Ignored
     }
 
     fn update_parameter_value(&self, id: &str) {
@@ -470,8 +429,8 @@ impl Plugin for CoPiReMapPlugin {
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let window_attributes = WindowAttributes::new(
-            LogicalSize::new(800.0, 600.0),
-            0.75,
+            LogicalSize::new(800.0, 500.0),
+            1.0,
         );
 
         let editor = SlintEditor::new(

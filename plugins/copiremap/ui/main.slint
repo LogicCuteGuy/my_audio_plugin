@@ -1,18 +1,12 @@
 import { PluginParameter } from "parameter.slint";
 import { ParameterKnob } from "knob.slint";
+import { ParameterSwitch } from "switch.slint";
 import { ParameterSlider } from "slider.slint";
+import "resource/font/Fingercute-Regular.ttf";
+import { VerticalBox, Button } from "std-widgets.slint";
 
 export component PluginWindow {
     in-out property<PluginParameter> gain;
-
-    in-out property <bool> dragging;
-    in-out property <length> drag-x;
-    in-out property <length> drag-y;
-    
-    // out property <length> drop-area-x: drop-area.x;
-    // out property <length> drop-area-y: drop-area.y;
-    // out property <length> drop-area-width: drop-area.width;
-    // out property <length> drop-area-height: drop-area.height;
 
     callback start-change(PluginParameter);
     callback changed(PluginParameter, float);
@@ -20,82 +14,129 @@ export component PluginWindow {
     callback set-string(PluginParameter, string);
 
     width: 800px;
-    height: 600px;
+    height: 500px;
     Rectangle {
-        background: gold;
-
-        // FIXME: Workaround for taking focus off TextInput by clicking outside it
-        TouchArea {
-            FocusScope {
-                enabled: true;
-            }
-        }
-
-        // drop-area := Rectangle {
-        //     background: red;
-        //     width: 100px;
-        //     height: 100px;
-
-        //     x: 350px + sin(mod(animation-tick(), 5s) / 5s * 360deg) * 350px;
-        //     y: 100px;
-
-        //     states [
-        //         dropping when dragging &&
-        //             drag-x >= self.x &&
-        //             drag-x <= self.x + self.width &&
-        //             drag-y >= self.y &&
-        //             drag-y <= self.y + self.height:
-        //         {
-        //             background: blue;                    
-        //         }
-        //     ]
-
-        //     TouchArea {
-        //         mouse-cursor: pointer;
-        //     }
-        // }
-
-        HorizontalLayout {
-            width: 300px;
-            height: 100px;
-            spacing: 25px;
-
-            ParameterKnob {
-                height: 25px;
-                parameter: gain;
-
-                // FIXME: Callbacks need to be mapped manually
-                start-change => { start-change(gain); }
-                changed(value) => { changed(gain, value); }
-                end-change => { end-change(gain); }
-                set-string(string) => { set-string(gain, string); }
+        background: @linear-gradient(120deg, #2256ff 0%, #ff3b3b 50%, #ffbb00 100%);
+        Rectangle {
+            background: @linear-gradient(180deg, #ffffff00 50%, #0000006f 100%);
+            // FIXME: Workaround for taking focus off TextInput by clicking outside it
+            TouchArea {
+                FocusScope {
+                    enabled: true;
+                }
             }
 
             VerticalLayout {
-                width: 200px;
-                height: 50px;
-                spacing: 25px;
-    
+                padding: 10px;
+                spacing: 10px;
+
                 Rectangle {
-                    height: 25px;
-                    background: white;
-    
-                    TextInput {
-                        font-size: 20px;
+                    height: 60px;
+                    border-radius: 5px;
+                    background: #00000061;
+                    border-color: #ffffffb5;
+                    border-width: 3px;
+                    HorizontalLayout {
+                        padding: 11px;
+                        alignment: center;
+                        Text {
+                            text: "C o P i R e M a p";
+                            font-size: 45px;
+                            color: white;
+                            font-family: "Fingercute";
+                        }
                     }
                 }
-    
-                ParameterSlider {
-                    height: 25px;
-                    parameter: gain;
-    
-                    // FIXME: Callbacks need to be mapped manually
-                    start-change => { start-change(gain); }
-                    changed(value) => { changed(gain, value); }
-                    end-change => { end-change(gain); }
-                    set-string(string) => { set-string(gain, string); }
+                
+                Rectangle {
+                    height: 100px;
+                    border-radius: 5px;
+                    background: #00000061;
+                    border-color: #ffffffb5;
+                    border-width: 3px;
+                    HorizontalLayout {
+                        padding: 12px;
+                        alignment: center;
+                    }
                 }
-            }    
-        }
+
+                Rectangle {
+                    height: 295px;
+                    border-radius: 5px;
+                    background: #00000061;
+                    border-color: #ffffffb5;
+                    border-width: 3px;
+                    HorizontalLayout {
+                        padding: 20px;
+                        spacing: 25px;
+        
+                        ParameterKnob {
+                            height: 25px;
+                            parameter: gain;
+                            text: "Gain";
+                            // FIXME: Callbacks need to be mapped manually
+                            start-change => { start-change(gain); }
+                            changed(value) => { changed(gain, value); }
+                            end-change => { end-change(gain); }
+                            set-string(string) => { set-string(gain, string); }
+                        }
+
+                        ParameterKnob {
+                            height: 25px;
+                            parameter: gain;
+        
+                            // FIXME: Callbacks need to be mapped manually
+                            start-change => { start-change(gain); }
+                            changed(value) => { changed(gain, value); }
+                            end-change => { end-change(gain); }
+                            set-string(string) => { set-string(gain, string); }
+                        }
+
+                        ParameterSwitch {
+                            height: 25px;
+                            parameter: gain;
+        
+                            // FIXME: Callbacks need to be mapped manually
+                            start-change => { start-change(gain); }
+                            changed(value) => { changed(gain, value); }
+                            end-change => { end-change(gain); }
+                            set-string(string) => { set-string(gain, string); }
+                        }
+
+                        ParameterSlider {
+                            height: 10px;
+                            width: 100px;
+                            parameter: gain;
+            
+                            // FIXME: Callbacks need to be mapped manually
+                            start-change => { start-change(gain); }
+                            changed(value) => { changed(gain, value); }
+                            end-change => { end-change(gain); }
+                            set-string(string) => { set-string(gain, string); }
+                        }
+                        
+                    }
+                }
+            }
+
+            
+            HorizontalLayout {
+                alignment: end;
+                VerticalLayout {
+                    alignment: end;
+                    Rectangle {
+                        width: 20px;
+                        height: 20px;
+                        Image {
+                            colorize: touch.has-hover && touch.pressed ? #aaaaaa : touch.has-hover ? #e0dfdf : #ffffff;
+                            source: @image-url("resource/img/resize-right.svg");
+                        }
+                        touch := TouchArea {
+
+                        }
+                    }
+                }
+            }
+        }    
     }
 }
