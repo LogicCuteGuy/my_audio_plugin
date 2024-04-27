@@ -1,7 +1,7 @@
 use nih_plug::audio_setup::BufferConfig;
 
 pub struct MyGate {
-    fast: f32,
+    pub fast: f32,
     sum: f32,
     param: f32,
     count: u16

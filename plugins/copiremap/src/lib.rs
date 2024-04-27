@@ -588,8 +588,8 @@ impl Plugin for CoPiReMapPlugin {
                 for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
                     let size = channel.len();
                     for sample in channel.iter_mut() {
-                        let delay = self.delay.process(*sample, i);
                         let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, &self.buffer_config, self.params.global.global_threshold.value(), self.params.global.global_threshold_attack.value(), self.params.global.global_threshold_release.value(), size);
+                        let delay = self.delay.process(*sample, i);
                         let gate1 = (gate_on.0 && !self.params.global.global_threshold_flip.value()) || (gate_on.1 && self.params.global.global_threshold_flip.value());
                         if gate1 {
                             let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => self.lpf.process(delay, i) };
