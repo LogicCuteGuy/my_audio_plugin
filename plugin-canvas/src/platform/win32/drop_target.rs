@@ -3,6 +3,7 @@ use std::ffi::OsString;
 use std::os::windows::prelude::OsStringExt;
 use std::ptr::null_mut;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 
 use windows::Win32::Foundation::{POINTL, POINT};
 use windows::Win32::Graphics::Gdi::ScreenToClient;
@@ -88,7 +89,7 @@ impl DropTarget {
     }
 
     fn convert_coordinates(&self, point: &POINTL) -> LogicalPosition {
-        let user_scale: f64 = self.window.window_attributes().user_scale.into();
+        let user_scale: f64 = self.window.window_attributes().user_scale.load(Ordering::SeqCst);
 
         let mut point = POINT {
             x: (point.x as f64) as i32,

@@ -30,7 +30,12 @@ export component ParameterKnob inherits Rectangle {
         alignment: center;
         spacing: 5px;
 
+        height: root.height;
+        width: root.height;
+
         texr := Rectangle {
+            height: 15px;
+            width: root.height;
             Text {
                 text: " " + text + " ";
                 color: white;
@@ -39,8 +44,8 @@ export component ParameterKnob inherits Rectangle {
 
         // Knob area
         knob := Rectangle {
-            height: 60px;
-            width: 60px;
+            height: root.height;
+            width: root.height;
             border-radius: 200px;
             background: #3c230b;
             border-color: white;

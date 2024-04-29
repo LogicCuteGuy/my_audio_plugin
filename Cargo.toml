@@ -28,6 +28,7 @@ thiserror = "1.0.58"
 rust-music-theory = "0.2.0"
 serde = { version = "1.0.198", features = ["derive"] }
 crossbeam = "0.8.4"
+atomic_float = "0.1.0"
 
 # Internal slint crate versions need to be pinned
 # since they don't maintain semver compatibility

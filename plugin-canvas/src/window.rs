@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use atomic_float::AtomicF64;
 use cursor_icon::CursorIcon;
 use raw_window_handle::{RawWindowHandle, HasRawWindowHandle, HasWindowHandle, Active, HasDisplayHandle, HasRawDisplayHandle};
 
@@ -8,11 +11,11 @@ pub type WindowBuilder = Box<dyn FnOnce(Window) + Send>;
 #[derive(Clone)]
 pub struct WindowAttributes {
     pub(crate) size: LogicalSize,
-    pub(crate) user_scale: f64,
+    pub(crate) user_scale: Arc<AtomicF64>,
 }
 
 impl WindowAttributes {
-    pub fn new(size: LogicalSize, user_scale: f64) -> Self {
+    pub fn new(size: LogicalSize, user_scale: Arc<AtomicF64>) -> Self {
         Self {
             size,
             user_scale,
@@ -20,7 +23,7 @@ impl WindowAttributes {
     }
 
     pub fn with_size(size: LogicalSize) -> Self {
-        Self::new(size, 1.0)
+        Self::new(size, Arc::new(AtomicF64::new(1.0)))
     }
 
     pub fn size(&self) -> LogicalSize {
@@ -28,11 +31,11 @@ impl WindowAttributes {
     }
 
     pub fn user_scale(&self) -> f64 {
-        self.user_scale
+        self.user_scale.load(Ordering::SeqCst)
     }
 
     pub fn scaled_size(&self) -> LogicalSize {
-        self.size * self.user_scale
+        self.size * self.user_scale.load(Ordering::SeqCst)
     }
 }
 

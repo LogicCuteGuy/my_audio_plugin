@@ -6,6 +6,7 @@ version = 3
 name = "CoPiReMap"
 version = "0.0.0"
 dependencies = [
+ "atomic_float",
  "crossbeam",
  "nih_plug",
  "nih_plug_slint",
@@ -3169,6 +3170,7 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "plugin-canvas"
 version = "0.0.0"
 dependencies = [
+ "atomic_float",
  "core-graphics 0.23.1",
  "cursor-icon",
  "icrate 0.1.0",

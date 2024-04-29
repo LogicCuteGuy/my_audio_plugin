@@ -13,6 +13,7 @@ cursor-icon.workspace = true
 lazy_static = "1.4"
 raw-window-handle.workspace = true
 uuid = { version = "1.4", features = ["fast-rng", "v4"] }
+atomic_float.workspace = true
 
 [target.'cfg(target_os="linux")'.dependencies]
 nix = { version = "0.27", features = ["poll"] }

@@ -1,11 +1,15 @@
 import { PluginParameter } from "parameter.slint";
 import { ParameterKnob } from "knob.slint";
 import { ParameterSlider } from "slider.slint";
+import { ParameterButton } from "button.slint";
 import "resource/font/Fingercute-Regular.ttf";
 import { VerticalBox, Button } from "std-widgets.slint";
 
 export component PluginWindow {
     in-out property<PluginParameter> gain;
+    in-out property<PluginParameter> bypass;
+
+    in-out property<int> latency;
 
     callback start-change(PluginParameter);
     callback changed(PluginParameter, float);
@@ -26,8 +30,8 @@ export component PluginWindow {
             }
 
             VerticalLayout {
-                padding: 10px;
-                spacing: 10px;
+                padding: 8px;
+                spacing: 7px;
 
                 Rectangle {
                     height: 60px;
@@ -36,19 +40,36 @@ export component PluginWindow {
                     border-color: #ffffffb5;
                     border-width: 3px;
                     HorizontalLayout {
-                        padding: 11px;
-                        alignment: center;
-                        Text {
-                            text: "C o P i R e M a p";
-                            font-size: 45px;
-                            color: white;
-                            font-family: "Fingercute";
+                        padding: 5px;
+                        alignment: space-between;
+                        HorizontalLayout {
+                            spacing: 5px;
+                            alignment: start;
+                            ParameterButton {
+                                height: 50px;
+                                parameter: bypass;
+                                start-change => { start-change(bypass); }
+                                changed(value) => { changed(bypass, value); }
+                                end-change => { end-change(bypass); }
+                                set-string(string) => { set-string(bypass, string); }
+                            }
+                            Text {
+                                text: "CoPiReMap";
+                                font-size: 55px;
+                                color: white;
+                                font-family: "Fingercute";
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 5px;
+                            alignment: start;
+                            
                         }
                     }
                 }
                 
                 Rectangle {
-                    height: 100px;
+                    height: 75px;
                     border-radius: 5px;
                     background: #00000061;
                     border-color: #ffffffb5;
@@ -60,7 +81,7 @@ export component PluginWindow {
                 }
 
                 Rectangle {
-                    height: 295px;
+                    height: 324px;
                     border-radius: 5px;
                     background: #00000061;
                     border-color: #ffffffb5;
@@ -70,7 +91,7 @@ export component PluginWindow {
                         spacing: 25px;
         
                         ParameterKnob {
-                            height: 25px;
+                            height: 60px;
                             parameter: gain;
                             text: "Gain";
                             // FIXME: Callbacks need to be mapped manually
@@ -81,7 +102,7 @@ export component PluginWindow {
                         }
 
                         ParameterKnob {
-                            height: 25px;
+                            height: 10px;
                             parameter: gain;
         
                             // FIXME: Callbacks need to be mapped manually
@@ -105,6 +126,7 @@ export component PluginWindow {
                         
                     }
                 }
+
             }
 
             
@@ -124,6 +146,30 @@ export component PluginWindow {
                         }
                     }
                 }
+            }
+
+            VerticalLayout {
+                alignment: end;
+                padding-bottom: 3px;
+                padding-left: 10px;
+                padding-right: 20px;
+                spacing: 0px;
+                HorizontalLayout {
+                    alignment: space-between;
+                    Text {
+                        text: "LogicCuteGuy";
+                        font-size: 15px;
+                        color: white;
+                        font-family: "Fingercute";
+                    }
+                    Text {
+                        text: "Latency: " + root.latency + "smp";
+                        font-size: 15px;
+                        color: white;
+                        font-family: "Fingercute";
+                    }
+                }
+                
             }
         }    
     }

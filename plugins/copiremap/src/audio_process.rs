@@ -76,7 +76,7 @@ impl AudioProcessParams {
                 min: 0.1,
                 max: 5.0,
             }).with_unit("ms.mb"),
-            resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 500.0 })
+            resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 300.0 })
                 .with_callback(
                     {
                         let update_bpf_center_hz = update_bpf_center_hz.clone();

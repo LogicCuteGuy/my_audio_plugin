@@ -70,7 +70,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            find_off_key: IntParam::new("Find Off Key", 4, IntRange::Linear{ min: 0, max: 72 })
+            find_off_key: IntParam::new("Find Off Key", 2, IntRange::Linear{ min: 0, max: 72 })
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();

@@ -8,7 +8,8 @@ mod gate;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use atomic_float::AtomicF64;
 
 use nih_plug::util::db_to_gain;
 use nih_plug::{nih_export_clap, nih_export_vst3};
@@ -20,6 +21,7 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
+use slint::WindowSize::Physical;
 use simple_eq::design::Curve;
 use crate::audio_process::{AudioProcess96, AudioProcessParams, PitchShiftNode};
 use crate::delay::{Delay, latency_average96};
@@ -46,6 +48,9 @@ pub struct PluginParams {
 
 #[derive(Params)]
 pub struct GlobalParams {
+
+    #[id = "scale_gui"]
+    pub scale_gui: FloatParam,
 
     #[id = "bypass"]
     pub bypass: BoolParam,
@@ -91,8 +96,19 @@ pub struct GlobalParams {
 }
 
 impl GlobalParams {
-    fn new(update_lowpass: Arc<AtomicBool>, update_highpass: Arc<AtomicBool>, update_bpf_center_hz: Arc<AtomicBool>, update_pitch_shift_and_after_bandpass: Arc<AtomicBool>) -> Self {
+    fn new(update_lowpass: Arc<AtomicBool>, update_highpass: Arc<AtomicBool>, update_bpf_center_hz: Arc<AtomicBool>, update_pitch_shift_and_after_bandpass: Arc<AtomicBool>, update_gui_scale: Arc<AtomicBool>) -> Self {
         Self {
+            scale_gui: FloatParam::new("Scale Gui", 1.0, FloatRange::Linear {
+                min: 0.50,
+                max: 1.5,
+            }).with_unit("x").with_callback(
+                {
+                    let update_gui_scale = update_gui_scale.clone();
+                    Arc::new(move |_| {
+                        update_gui_scale.store(true, Ordering::Release);
+                    })
+                }
+            ),
             bypass: BoolParam::new("Bypass", false)
                 .with_value_to_string(formatters::v2s_bool_bypass())
                 .with_string_to_value(formatters::s2v_bool_bypass())
@@ -204,10 +220,12 @@ impl GlobalParams {
 pub struct PluginComponent {
     component: PluginWindow,
     param_map: HashMap<SharedString, ParamPtr>,
+    latency: Arc<AtomicU32>,
+    gui_context: Arc<dyn GuiContext>
 }
 
 impl PluginComponent {
-    fn new(params: Arc<PluginParams>) -> Self {
+    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>) -> Self {
         let component = PluginWindow::new().unwrap();
         let param_map: HashMap<SharedString, _> = params.param_map().iter()
             .map(|(name, param_ptr, _)| {
@@ -218,6 +236,8 @@ impl PluginComponent {
         Self {
             component,
             param_map,
+            latency,
+            gui_context
         }
     }
 
@@ -239,8 +259,18 @@ impl PluginComponent {
     }
 
     fn set_parameter(&self, id: &str, parameter: PluginParameter) {
+        let latency = self.latency.load(Ordering::SeqCst);
         match id {
-            "midi" => self.component.set_gain(parameter),
+            "scale_gui" => {
+                self.window().set_size(self.window().size().to_logical(parameter.value));
+                self.component.set_gain(parameter);
+                self.gui_context.request_resize();
+            },
+            "pitch_shift_over_sampling" => self.component.set_latency(latency as i32),
+            "pitch_shift_window_duration_ms" => {
+                self.component.set_latency(latency as i32);
+            },
+            "bypass" => self.component.set_bypass(parameter),
             _ => (),
         }
     }
@@ -302,7 +332,6 @@ pub struct CoPiReMapPlugin {
     hpf: MyFilter,
     delay: Delay,
     gate: MyGate,
-
     update_lowpass: Arc<AtomicBool>,
     update_highpass: Arc<AtomicBool>,
 
@@ -314,6 +343,11 @@ pub struct CoPiReMapPlugin {
 
     update_key_note: Arc<AtomicBool>,
     update_key_note_12: Arc<AtomicBool>,
+
+    update_gui_scale: Arc<AtomicBool>,
+
+    latency: Arc<AtomicU32>,
+    user_scale: Arc<AtomicF64>,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -330,14 +364,18 @@ impl Default for CoPiReMapPlugin {
         let update_key_note = Arc::new(AtomicBool::new(false));
         let update_key_note_12 = Arc::new(AtomicBool::new(false));
 
+        let update_gui_scale = Arc::new(AtomicBool::new(false));
+
         let mut audio_process96 = Vec::with_capacity(96);
         for _ in 0..96 {
             audio_process96.push(AudioProcess96::default());
         };
 
+        let latency = Arc::new(AtomicU32::new(0));
+
         Self {
             params: Arc::new(PluginParams {
-                global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone())),
+                global: Arc::new(GlobalParams::new(update_lowpass.clone(), update_highpass.clone(), update_bpf_center_hz.clone(), update_pitch_shift_and_after_bandpass.clone(),  update_gui_scale.clone())),
                 audio_process: Arc::new(AudioProcessParams::new(update_pitch_shift_over_sampling.clone(), update_pitch_shift_window_duration_ms.clone(), update_pitch_shift_and_after_bandpass.clone(), update_bpf_center_hz.clone(), set_pitch_shift_12_node.clone())),
                 key_note: Arc::new(KeyNoteParams::new(update_key_note.clone(), update_key_note_12.clone())),
             }),
@@ -361,7 +399,10 @@ impl Default for CoPiReMapPlugin {
             update_bpf_center_hz,
             set_pitch_shift_12_node,
             update_key_note,
-            update_key_note_12
+            update_key_note_12,
+            update_gui_scale,
+            latency,
+            user_scale: Arc::new(AtomicF64::new(1.0)),
         }
     }
 }
@@ -404,14 +445,15 @@ impl Plugin for CoPiReMapPlugin {
         self.buffer_config = *buffer_config;
         let mut lowpass: f32 = 0.0;
         hz_cal_clh((self.params.global.low_note_off.value() - 36) as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
-        self.lpf.set(Curve::Lowpass, lowpass, 1.0, 0.0, buffer_config.sample_rate);
+        self.lpf.set(Curve::Lowpass, lowpass, 1.0, 0.0, self.buffer_config.sample_rate);
         let mut highpass: f32 = 0.0;
         hz_cal_clh((self.params.global.high_note_off.value() - 36) as u8, 0, &mut highpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
-        self.hpf.set(Curve::Highpass, highpass, 1.0, 0.0, buffer_config.sample_rate);
-        self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config);
+        self.hpf.set(Curve::Highpass, highpass, 1.0, 0.0, self.buffer_config.sample_rate);
         for (i, audio_process) in self.audio_process96.iter_mut().enumerate() {
             audio_process.setup(self.params.clone(), i as u8, &self.buffer_config, &self.midi_note);
         }
+        
+        self.midi_note.param_update(self.params.clone(), &mut self.audio_process96, &self.buffer_config);
         true
     }
 
@@ -424,17 +466,18 @@ impl Plugin for CoPiReMapPlugin {
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let window_attributes = WindowAttributes::new(
             LogicalSize::new(800.0, 500.0),
-            1.0,
+            self.user_scale.clone(),
         );
-
         let editor = SlintEditor::new(
             window_attributes,
             {
                 let params = self.params.clone();
-                move |_window, _gui_context| PluginComponent::new(params.clone())
+                let latency = self.latency.clone();
+                move |_window, gui_context| {
+                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone())
+                }
             },
         );
-
         Some(Box::new(editor))
     }
 
@@ -459,7 +502,16 @@ impl Plugin for CoPiReMapPlugin {
                     for ap in self.audio_process96.iter_mut() {
                         ap.set_delay(latency)
                     }
+                    self.latency.set(latency);
                     context.set_latency_samples(latency);
+                }
+                if self
+                    .update_gui_scale
+                    .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_ok()
+                {
+                    self.user_scale.store(self.params.global.scale_gui.value() as f64, Ordering::Release);
+
                 }
                 if self
                     .update_lowpass

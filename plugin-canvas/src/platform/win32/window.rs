@@ -59,7 +59,7 @@ impl OsWindow {
     }
 
     fn logical_mouse_position(&self, lparam: LPARAM) -> LogicalPosition {
-        let user_scale: f64 = self.window_attributes.user_scale.into();
+        let user_scale: f64 = self.window_attributes.user_scale.load(Ordering::SeqCst);
 
         PhysicalPosition {
             x: (lparam.0 & 0xFFFF) as i16 as i32,
@@ -80,7 +80,7 @@ impl OsWindowInterface for OsWindow {
         };
 
         let class_name = to_wstr("plugin-canvas-".to_string() + &Uuid::new_v4().simple().to_string());
-        let size = Size::with_logical_size(window_attributes.size, window_attributes.user_scale);
+        let size = Size::with_logical_size(window_attributes.size, window_attributes.user_scale.load(Ordering::SeqCst));
 
         let cursor = unsafe { LoadCursorW(HINSTANCE(0), IDC_ARROW).unwrap() };
 
@@ -246,7 +246,7 @@ impl OsWindowInterface for OsWindow {
     }
 
     fn warp_mouse(&self, position: LogicalPosition) {
-        let user_scale: f64 = self.window_attributes.user_scale.into();
+        let user_scale: f64 = self.window_attributes.user_scale.load(Ordering::SeqCst);
         let physical_position = position.to_physical(user_scale);
 
         let mut point = POINT {
