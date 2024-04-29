@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use nih_plug::audio_setup::BufferConfig;
 use nih_plug::formatters;
-use nih_plug::params::{BoolParam, FloatParam, IntParam, Params};
-use nih_plug::prelude::{FloatRange, IntRange};
+use nih_plug::params::{BoolParam, EnumParam, FloatParam, IntParam, Params};
+use nih_plug::prelude::{Enum, FloatRange, IntRange};
 use nih_plug::util::db_to_gain;
 use simple_eq::design::Curve;
 use crate::{PluginParams};
@@ -11,6 +11,7 @@ use crate::delay::Delay;
 use crate::filter::MyFilter;
 use crate::gate::MyGate;
 use crate::hertz_calculator::{hz_cal_clh, hz_cal_tlh};
+use crate::key_note_midi_gen::{MidiNote, NoteModeMidi};
 use crate::pitch::MyPitch;
 
 #[derive(Params)]
@@ -33,8 +34,8 @@ pub struct AudioProcessParams {
     #[id = "pitch_shift"]
     pub pitch_shift: BoolParam,
 
-    #[id = "pitch_shift_12_node"]
-    pub pitch_shift_12_node: BoolParam,
+    #[id = "pitch_shift_node"]
+    pub pitch_shift_node: EnumParam<PitchShiftNode>,
 
     #[id = "pitch_shift_over_sampling"]
     pub pitch_shift_over_sampling: IntParam,
@@ -93,10 +94,7 @@ impl AudioProcessParams {
                     update_pitch_shift_and_after_bandpass.store(true, Ordering::Release);
                 })
             }),
-            pitch_shift_12_node: BoolParam::new(
-                "Pitch Shift 12 Node",
-                true,
-            ).with_callback({
+            pitch_shift_node: EnumParam::new("Pitch Shift Node", PitchShiftNode::Node12).with_callback({
                 let set_pitch_shift_12_node = set_pitch_shift_12_node.clone();
                 Arc::new(move |_| {
                     set_pitch_shift_12_node.store(true, Ordering::Release);
@@ -168,6 +166,17 @@ impl AudioProcessParams {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Enum)]
+#[non_exhaustive]
+pub enum PitchShiftNode {
+    #[id = "96_node"]
+    #[name = "96 Node"]
+    Node96,
+    #[id = "12_node"]
+    #[name = "12 Node"]
+    Node12,
+}
+
 pub struct AudioProcess96 {
     bpf: MyFilter,
     pub tuning: Option<MyPitch>,
@@ -204,36 +213,42 @@ impl AudioProcess96 {
         self.delay.set_delay(delay);
     }
 
-    pub fn setup(&mut self, params: Arc<PluginParams>, note: u8, buffer_config: &BufferConfig) {
-        let note_pitch: i8 = params.note_table.i2t.load().i96[note as usize];
+    pub fn setup(&mut self, params: Arc<PluginParams>, note: u8, buffer_config: &BufferConfig, midi_notes: &MidiNote) {
+        let note_pitch: i8 = match params.key_note.note_mode_midi.value() {
+            NoteModeMidi::MidiWhistle | NoteModeMidi::MidiScale => midi_notes.im2t[self.note as usize],
+            _ => midi_notes.i2t[self.note as usize]
+        };
         let mut pitch_tune_hz: f32 = 0.0;
         let mut bandpass: f32 = 0.0;
         self.note_pitch = note_pitch;
         hz_cal_tlh(note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value(), !params.audio_process.pitch_shift.value());
-        if params.audio_process.pitch_shift_12_node.value() && note < ((params.global.low_note_off.value() as usize - 36) + 12) as u8 {
+        if params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node12 && note < ((params.global.low_note_off.value() as usize - 36) + 12) as u8 {
             self.tuning = Some(MyPitch::set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz));
         } else {
             self.tuning = None;
         }
-        if !params.audio_process.pitch_shift_12_node.value() {
+        if params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node96 {
             self.tuning = Some(MyPitch::set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz));
         }
         self.bpf.set(Curve::Bandpass, bandpass, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
         self.note = note;
     }
 
-    pub fn set_pitch_shift_12_node(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig) {
-        let note_pitch: i8 = params.note_table.i2t.load().i96[self.note as usize];
+    pub fn set_pitch_shift_12_node(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig, midi_notes: &MidiNote) {
+        let note_pitch: i8 = match params.key_note.note_mode_midi.value() {
+            NoteModeMidi::MidiWhistle | NoteModeMidi::MidiScale => midi_notes.im2t[self.note as usize],
+            _ => midi_notes.i2t[self.note as usize]
+        };
         let mut pitch_tune_hz: f32 = 0.0;
         let mut bandpass: f32 = 0.0;
         self.note_pitch = note_pitch;
         hz_cal_tlh(self.note, note_pitch, &mut pitch_tune_hz, &mut bandpass, params.global.hz_center.value(), params.global.hz_tuning.value(), !params.audio_process.pitch_shift.value());
-        if params.audio_process.pitch_shift_12_node.value() && self.note < ((params.global.low_note_off.value() as usize - 36) + 12) as u8 {
+        if params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node12 && self.note < ((params.global.low_note_off.value() as usize - 36) + 12) as u8 {
             self.tuning = Some(MyPitch::set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz));
         } else {
             self.tuning = None;
         }
-        if !params.audio_process.pitch_shift_12_node.value() {
+        if params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node96 {
             self.tuning = Some(MyPitch::set_window_duration_ms(params.audio_process.pitch_shift_window_duration_ms.value() as u8, buffer_config.sample_rate, params.audio_process.pitch_shift_over_sampling.value() as u8, pitch_tune_hz));
         }
     }
@@ -267,15 +282,18 @@ impl AudioProcess96 {
         }
     }
 
-    pub fn set_bpf_center_hz(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig) {
-        let note_pitch: i8 = params.note_table.i2t.load().i96[self.note as usize];
+    pub fn set_bpf_center_hz(&mut self, params: Arc<PluginParams>, buffer_config: &BufferConfig, midi_notes: &MidiNote) {
+        let note_pitch: i8 = match params.key_note.note_mode_midi.value() {
+            NoteModeMidi::MidiWhistle | NoteModeMidi::MidiScale => midi_notes.im2t[self.note as usize],
+            _ => midi_notes.i2t[self.note as usize]
+        };
         let mut center_hz: f32 = 0.0;
         hz_cal_clh(self.note, note_pitch, &mut center_hz, params.global.hz_center.value(), !params.audio_process.pitch_shift.value());
         self.bpf.set(Curve::Bandpass, center_hz, params.audio_process.resonance.value(), 0.0, buffer_config.sample_rate);
     }
 
     pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32, buffer_config: &BufferConfig, buf_size: usize) -> f32 {
-        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !!(params.audio_process.pitch_shift_12_node.value() || self.open.0 && !params.audio_process.threshold_flip.value() || self.open.1 && params.audio_process.threshold_flip.value()) {
+        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !!(params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node12 || self.open.0 && !params.audio_process.threshold_flip.value() || self.open.1 && params.audio_process.threshold_flip.value()) {
             true => match self.tuning.as_mut() {
                 None => {
                     0.0
@@ -293,11 +311,11 @@ impl AudioProcess96 {
                 }
             }
         };
-        let bpf: f32 = match params.audio_process.pitch_shift_12_node.value() {
-            true => {
+        let bpf: f32 = match params.audio_process.pitch_shift_node.value() {
+            PitchShiftNode::Node12 => {
                 pitch
             }
-            false => {
+            PitchShiftNode::Node96 => {
                 if input_param > db_to_gain(-60.0) {
                     self.process_bpf(pitch, audio_id, input_param, params.clone())
                 } else {

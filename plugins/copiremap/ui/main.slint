@@ -1,6 +1,5 @@
 import { PluginParameter } from "parameter.slint";
 import { ParameterKnob } from "knob.slint";
-import { ParameterSwitch } from "switch.slint";
 import { ParameterSlider } from "slider.slint";
 import "resource/font/Fingercute-Regular.ttf";
 import { VerticalBox, Button } from "std-widgets.slint";
@@ -82,17 +81,6 @@ export component PluginWindow {
                         }
 
                         ParameterKnob {
-                            height: 25px;
-                            parameter: gain;
-        
-                            // FIXME: Callbacks need to be mapped manually
-                            start-change => { start-change(gain); }
-                            changed(value) => { changed(gain, value); }
-                            end-change => { end-change(gain); }
-                            set-string(string) => { set-string(gain, string); }
-                        }
-
-                        ParameterSwitch {
                             height: 25px;
                             parameter: gain;
         

@@ -1,28 +1,21 @@
-use nih_plug::params::{BoolParam, IntParam, Params};
-use nih_plug::prelude::{IntRange};
+use nih_plug::params::{BoolParam, IntParam, EnumParam, Params};
+use nih_plug::prelude::{Enum, IntRange};
 use crate::{PluginParams};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use nih_plug::audio_setup::BufferConfig;
 use crate::audio_process::AudioProcess96;
-use crate::note_table::NoteTablesArray;
 
 #[derive(Params)]
 pub struct KeyNoteParams {
-    #[id = "midi"]
-    pub midi: BoolParam,
-
-    #[id = "repeat"]
-    pub repeat: BoolParam,
+    #[id = "note_mode_midi"]
+    pub note_mode_midi: EnumParam<NoteModeMidi>,
 
     #[id = "find_off_key"]
     pub find_off_key: IntParam,
 
     #[id = "mute_off_key"]
     pub mute_off_key: BoolParam,
-
-    #[id = "table_to_midi"]
-    pub table_to_midi: BoolParam,
 
     #[id = "round_up"]
     pub round_up: BoolParam,
@@ -42,42 +35,33 @@ pub struct KeyNoteParams {
     #[id = "note_e"]
     pub note_e: BoolParam,
 
-    #[id = "f"]
-    pub f: BoolParam,
+    #[id = "note_f"]
+    pub note_f: BoolParam,
 
-    #[id = "f_sharp"]
-    pub f_sharp: BoolParam,
+    #[id = "note_f_sharp"]
+    pub note_f_sharp: BoolParam,
 
-    #[id = "g"]
-    pub g: BoolParam,
+    #[id = "note_g"]
+    pub note_g: BoolParam,
 
-    #[id = "g_sharp"]
-    pub g_sharp: BoolParam,
+    #[id = "note_g_sharp"]
+    pub note_g_sharp: BoolParam,
 
-    #[id = "a"]
-    pub a: BoolParam,
+    #[id = "note_a"]
+    pub note_a: BoolParam,
 
-    #[id = "a_sharp"]
-    pub a_sharp: BoolParam,
+    #[id = "note_a_sharp"]
+    pub note_a_sharp: BoolParam,
 
-    #[id = "b"]
-    pub b: BoolParam,
+    #[id = "note_b"]
+    pub note_b: BoolParam,
 }
 
 impl KeyNoteParams {
     pub fn new(update_key_note: Arc<AtomicBool>, update_key_note_12: Arc<AtomicBool>) -> Self {
 
         Self {
-            midi: BoolParam::new("Midi", false)
-                .with_callback(
-                {
-                    let update_key_note = update_key_note.clone();
-                    Arc::new(move |_| {
-                        update_key_note.store(true, Ordering::Release);
-                    })
-                }
-            ),
-            repeat: BoolParam::new("Repeat", true)
+            note_mode_midi: EnumParam::new("Note Mode/Midi", NoteModeMidi::Scale)
                 .with_callback(
                 {
                     let update_key_note = update_key_note.clone();
@@ -96,15 +80,6 @@ impl KeyNoteParams {
                 }
             ),
             mute_off_key: BoolParam::new("Mute Off Key", true),
-            table_to_midi: BoolParam::new("Table to Midi", false)
-                .with_callback(
-                    {
-                        let update_key_note = update_key_note.clone();
-                        Arc::new(move |_| {
-                            update_key_note.store(false, Ordering::Release);
-                        })
-                    }
-                ),
             round_up: BoolParam::new("Round Up", false)
                 .with_callback(
                 {
@@ -159,7 +134,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            f: BoolParam::new("Note F", false)
+            note_f: BoolParam::new("Note F", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -168,7 +143,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            f_sharp: BoolParam::new("Note F#", true)
+            note_f_sharp: BoolParam::new("Note F#", true)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -177,7 +152,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            g: BoolParam::new("Note G", true)
+            note_g: BoolParam::new("Note G", true)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -186,7 +161,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            g_sharp: BoolParam::new("Note G#", false)
+            note_g_sharp: BoolParam::new("Note G#", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -195,7 +170,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            a: BoolParam::new("Note A", true)
+            note_a: BoolParam::new("Note A", true)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -204,7 +179,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            a_sharp: BoolParam::new("Note A#", false)
+            note_a_sharp: BoolParam::new("Note A#", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -213,7 +188,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            b: BoolParam::new("Note B", true)
+            note_b: BoolParam::new("Note B", true)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -226,67 +201,76 @@ impl KeyNoteParams {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Enum)]
+#[non_exhaustive]
+pub enum NoteModeMidi {
+    #[id = "scale"]
+    #[name = "Scale"]
+    Scale,
+    #[id = "midi_scale"]
+    #[name = "Midi Scale"]
+    MidiScale,
+    #[id = "midi_whistle"]
+    #[name = "Midi Whistle"]
+    MidiWhistle,
+}
+
 pub struct MidiNote {
-    pub note: [bool; 96]
+    pub midi_note: [bool; 96],
+    pub i2t: [i8; 96],
+    pub im2t: [i8; 96],
 }
 
 impl Default for MidiNote {
     fn default() -> Self {
         Self {
-            note: [false; 96]
+            midi_note: [false; 96],
+            i2t: [0; 96],
+            im2t: [0; 96]
         }
     }
 }
 
 impl MidiNote {
 
-    pub fn update(&self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
-        let mut notes: [i8; 96] = params.note_table.i2t.load().i96;
-        match params.key_note.repeat.value() {
-            true => {
-                let mut note_on_keys = [false; 96];
-                let mut notes_sel: [i8; 96] = [-128; 96];
-                for i in 0..96 {
-                    let a: u8 = i % 12;
-                    match a {
-                        0 => { note_on_keys[i as usize] = params.key_note.note_c.value(); }
-                        1 => { note_on_keys[i as usize] = params.key_note.note_c_sharp.value(); }
-                        2 => { note_on_keys[i as usize] = params.key_note.note_d.value(); }
-                        3 => { note_on_keys[i as usize] = params.key_note.note_d_sharp.value(); }
-                        4 => { note_on_keys[i as usize] = params.key_note.note_e.value(); }
-                        5 => { note_on_keys[i as usize] = params.key_note.f.value(); }
-                        6 => { note_on_keys[i as usize] = params.key_note.f_sharp.value(); }
-                        7 => { note_on_keys[i as usize] = params.key_note.g.value(); }
-                        8 => { note_on_keys[i as usize] = params.key_note.g_sharp.value(); }
-                        9 => { note_on_keys[i as usize] = params.key_note.a.value(); }
-                        10 => { note_on_keys[i as usize] = params.key_note.a_sharp.value(); }
-                        11 => { note_on_keys[i as usize] = params.key_note.b.value(); }
-                        _ => {}
-                    }
-                }
-                self.find_off_key(params.clone(), &note_on_keys, &mut notes_sel, [0; 96]);
-                notes = notes_sel;
-            }
-            false => {
+    pub fn update(&mut self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
+        let mut notes: [i8; 96];
+        let mut note_on_keys = [false; 96];
+        let mut notes_sel: [i8; 96] = [-128; 96];
+        for i in 0..96 {
+            let a: u8 = i % 12;
+            match a {
+                0 => { note_on_keys[i as usize] = params.key_note.note_c.value(); }
+                1 => { note_on_keys[i as usize] = params.key_note.note_c_sharp.value(); }
+                2 => { note_on_keys[i as usize] = params.key_note.note_d.value(); }
+                3 => { note_on_keys[i as usize] = params.key_note.note_d_sharp.value(); }
+                4 => { note_on_keys[i as usize] = params.key_note.note_e.value(); }
+                5 => { note_on_keys[i as usize] = params.key_note.note_f.value(); }
+                6 => { note_on_keys[i as usize] = params.key_note.note_f_sharp.value(); }
+                7 => { note_on_keys[i as usize] = params.key_note.note_g.value(); }
+                8 => { note_on_keys[i as usize] = params.key_note.note_g_sharp.value(); }
+                9 => { note_on_keys[i as usize] = params.key_note.note_a.value(); }
+                10 => { note_on_keys[i as usize] = params.key_note.note_a_sharp.value(); }
+                11 => { note_on_keys[i as usize] = params.key_note.note_b.value(); }
+                _ => {}
             }
         }
-        params.note_table.i2t.store(NoteTablesArray { i96: notes});
-        if !params.key_note.midi.value() {
-            AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
-        }
+        self.find_off_key(params.clone(), &note_on_keys, &mut notes_sel);
+        notes = notes_sel;
+        self.i2t = notes;
+        AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
-    pub fn update_midi(&self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
-        let mut notes: [i8; 96] = params.note_table.im2t.load().i96;
-        let notes2: [i8; 96] = params.note_table.i2t.load().i96;
-        match params.key_note.repeat.value() {
-            true => {
+    pub fn update_midi(&mut self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
+        let mut notes: [i8; 96] = [0; 96];
+        match params.key_note.note_mode_midi.value() {
+            NoteModeMidi::MidiScale => {
                 let mut note_on_keys = [false; 96];
                 let mut note_keys = [false; 12];
                 let mut notes_sel: [i8; 96] = [-128; 96];
                 for i in 0..96 {
                     let a: u8 = i % 12;
-                    match self.note[i as usize] {
+                    match self.midi_note[i as usize] {
                         true => { note_keys[a as usize] = true; }
                         false => {}
                     }
@@ -309,21 +293,21 @@ impl MidiNote {
                         _ => {}
                     }
                 }
-                self.find_off_key(params.clone(), &note_on_keys, &mut notes_sel, notes2);
+                self.find_off_key(params.clone(), &note_on_keys, &mut notes_sel);
                 notes = notes_sel;
             }
-            false => {
+            NoteModeMidi::MidiWhistle => {
                 let mut notes_sel: [i8; 96] = [-128; 96];
-                self.find_off_key(params.clone(), &self.note, &mut notes_sel, notes2);
+                self.find_off_key(params.clone(), &self.midi_note, &mut notes_sel);
                 notes = notes_sel;
             }
+            _ => {}
         }
-        params.note_table.im2t.store(NoteTablesArray { i96: notes});
-        params.note_table.i2t.store(NoteTablesArray { i96: notes2});
+        self.im2t = notes;
         AudioProcess96::fn_update_pitch_shift_and_after_bandpass(params, audio_process, buffer_config, notes);
     }
 
-    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 96], notes_sel: &mut [i8; 96], table: [i8; 96]) {
+    fn find_off_key(&self, params: Arc<PluginParams>, note_on_keys: &[bool; 96], notes_sel: &mut [i8; 96]) {
         for i in 0..params.key_note.find_off_key.value() {
             match params.key_note.round_up.value() {
                 true => {
@@ -332,20 +316,12 @@ impl MidiNote {
                             true => {
                                 notes_sel[j] = 0;
                                 if j as i8 - i as i8 > -1 && notes_sel[j - i as usize] == -128 {
-                                    if params.key_note.table_to_midi.value() && params.key_note.midi.value() {
-                                        notes_sel[j - i as usize] = table[j - i as usize];
-                                    } else {
-                                        notes_sel[j - i as usize] = 0;
-                                        notes_sel[j - i as usize] = i as i8;
-                                    }
+                                    notes_sel[j - i as usize] = 0;
+                                    notes_sel[j - i as usize] = i as i8;
                                 }
                                 if j + i as usize <= 95 && notes_sel[j + i as usize] == -128 {
-                                    if params.key_note.table_to_midi.value() && params.key_note.midi.value() {
-                                        notes_sel[j + i as usize] = table[j + i as usize];
-                                    } else {
-                                        notes_sel[j + i as usize] = 0;
-                                        notes_sel[j + i as usize] = -i as i8;
-                                    }
+                                    notes_sel[j + i as usize] = 0;
+                                    notes_sel[j + i as usize] = -i as i8;
                                     
                                 }
                             }
@@ -361,20 +337,12 @@ impl MidiNote {
                             true => {
                                 notes_sel[j] = 0;
                                 if j as i8 - i as i8 > -1 && notes_sel[j - i as usize] == -128 {
-                                    if params.key_note.table_to_midi.value() && params.key_note.midi.value() {
-                                        notes_sel[j - i as usize] = table[j - i as usize];
-                                    } else {
-                                        notes_sel[j - i as usize] = 0;
-                                        notes_sel[j - i as usize] = i as i8;
-                                    }
+                                    notes_sel[j - i as usize] = 0;
+                                    notes_sel[j - i as usize] = i as i8;
                                 }
                                 if j + i as usize <= 95 && notes_sel[j + i as usize] == -128 {
-                                    if params.key_note.table_to_midi.value() && params.key_note.midi.value() {
-                                        notes_sel[j + i as usize] = table[j + i as usize];
-                                    } else {
-                                        notes_sel[j + i as usize] = 0;
-                                        notes_sel[j + i as usize] = -i as i8;
-                                    }
+                                    notes_sel[j + i as usize] = 0;
+                                    notes_sel[j + i as usize] = -i as i8;
                                 }
                             }
                             false => {
@@ -387,10 +355,10 @@ impl MidiNote {
         }
     }
 
-    pub fn param_update(&self, params: Arc<PluginParams>, audio_process: &mut Vec<AudioProcess96>, buffer_config: &BufferConfig) {
-        match params.key_note.midi.value() {
-            true => self.update_midi(params, audio_process, buffer_config),
-            false => self.update(params, audio_process, buffer_config),
+    pub fn param_update(&mut self, params: Arc<PluginParams>, audio_process: &mut [AudioProcess96], buffer_config: &BufferConfig) {
+        match params.key_note.note_mode_midi.value() {
+            NoteModeMidi::MidiScale | NoteModeMidi::MidiWhistle => self.update_midi(params, audio_process, buffer_config),
+            NoteModeMidi::Scale => self.update(params, audio_process, buffer_config),
         }
     }
 
