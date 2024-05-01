@@ -8,7 +8,7 @@ mod gate;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 use atomic_float::AtomicF64;
 
 use nih_plug::util::db_to_gain;
@@ -17,11 +17,9 @@ use nih_plug::params::persist::PersistentField;
 use nih_plug::prelude::*;
 use nih_plug_slint::plugin_component_handle::{PluginComponentHandle, PluginComponentHandleParameterEvents};
 use nih_plug_slint::{WindowAttributes, editor::SlintEditor};
-use plugin_canvas::drag_drop::DropOperation;
-use plugin_canvas::{LogicalSize, Event, LogicalPosition};
+use plugin_canvas::{LogicalSize, Event};
 use plugin_canvas::event::EventResponse;
-use slint::SharedString;
-use slint::WindowSize::Physical;
+use slint::{ModelRc, SharedString};
 use simple_eq::design::Curve;
 use crate::audio_process::{AudioProcess96, AudioProcessParams, PitchShiftNode};
 use crate::delay::{Delay, latency_average96};
@@ -221,11 +219,13 @@ pub struct PluginComponent {
     component: PluginWindow,
     param_map: HashMap<SharedString, ParamPtr>,
     latency: Arc<AtomicU32>,
-    gui_context: Arc<dyn GuiContext>
+    gui_context: Arc<dyn GuiContext>,
+    global_meter: Arc<AtomicF32>,
+    update_meter: AtomicU16,
 }
 
 impl PluginComponent {
-    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>) -> Self {
+    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>, global_meter: Arc<AtomicF32>) -> Self {
         let component = PluginWindow::new().unwrap();
         let param_map: HashMap<SharedString, _> = params.param_map().iter()
             .map(|(name, param_ptr, _)| {
@@ -237,7 +237,9 @@ impl PluginComponent {
             component,
             param_map,
             latency,
-            gui_context
+            gui_context,
+            global_meter,
+            update_meter: AtomicU16::new(0)
         }
     }
 
@@ -262,15 +264,29 @@ impl PluginComponent {
         let latency = self.latency.load(Ordering::SeqCst);
         match id {
             "scale_gui" => {
-                self.window().set_size(self.window().size().to_logical(parameter.value));
-                self.component.set_gain(parameter);
                 self.gui_context.request_resize();
+                self.component.set_scale_gui(parameter)
             },
             "pitch_shift_over_sampling" => self.component.set_latency(latency as i32),
             "pitch_shift_window_duration_ms" => {
                 self.component.set_latency(latency as i32);
             },
             "bypass" => self.component.set_bypass(parameter),
+            "dry_gain" => self.component.set_dry_gain(parameter),
+            "wet_gain" => self.component.set_wet_gain(parameter),
+            "lhf_gain" => self.component.set_lhf_gain(parameter),
+            "note_c" => self.component.set_note_c(parameter),
+            "note_c_sharp" => self.component.set_note_c_sharp(parameter),
+            "note_d" => self.component.set_note_d(parameter),
+            "note_d_sharp" => self.component.set_note_d_sharp(parameter),
+            "note_e" => self.component.set_note_e(parameter),
+            "note_f" => self.component.set_note_f(parameter),
+            "note_f_sharp" => self.component.set_note_f_sharp(parameter),
+            "note_g" => self.component.set_note_g(parameter),
+            "note_g_sharp" => self.component.set_note_g_sharp(parameter),
+            "note_a" => self.component.set_note_a(parameter),
+            "note_a_sharp" => self.component.set_note_a_sharp(parameter),
+            "note_b" => self.component.set_note_b(parameter),
             _ => (),
         }
     }
@@ -285,8 +301,22 @@ impl PluginComponentHandle for PluginComponent {
         &self.param_map
     }
 
-    fn on_event(&self, _event: &Event) -> EventResponse {
-        EventResponse::Ignored
+    fn on_event(&self, event: &Event) -> EventResponse {
+        match event {
+            Event::Draw => {
+                let update = self.update_meter.load(Ordering::SeqCst);
+                if update > 8 {
+                    self.component.set_global_meter(self.global_meter.load(Ordering::SeqCst));
+                    self.update_meter.store(0, Ordering::Release);
+                } else {
+                    self.update_meter.store(update + 1, Ordering::Release);
+                }
+                EventResponse::Ignored
+            },
+            _ => {
+                EventResponse::Ignored
+            }
+        }
     }
 
     fn update_parameter_value(&self, id: &str) {
@@ -300,7 +330,7 @@ impl PluginComponentHandle for PluginComponent {
 
     fn update_all_parameters(&self) {
         for id in self.param_map.keys() {
-            self.update_parameter_value(id);
+            self.update_parameter_value(id); 
         }
     }
 }
@@ -348,6 +378,9 @@ pub struct CoPiReMapPlugin {
 
     latency: Arc<AtomicU32>,
     user_scale: Arc<AtomicF64>,
+
+    global_meter: Arc<AtomicF32>,
+    note_meter: Arc<Vec<f32>>,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -367,8 +400,10 @@ impl Default for CoPiReMapPlugin {
         let update_gui_scale = Arc::new(AtomicBool::new(false));
 
         let mut audio_process96 = Vec::with_capacity(96);
+        let mut note_meter = Vec::with_capacity(96);
         for _ in 0..96 {
             audio_process96.push(AudioProcess96::default());
+            note_meter.push(0.0);
         };
 
         let latency = Arc::new(AtomicU32::new(0));
@@ -403,6 +438,8 @@ impl Default for CoPiReMapPlugin {
             update_gui_scale,
             latency,
             user_scale: Arc::new(AtomicF64::new(1.0)),
+            global_meter: Arc::new(AtomicF32::new(0.0)),
+            note_meter: Arc::new(note_meter),
         }
     }
 }
@@ -473,8 +510,9 @@ impl Plugin for CoPiReMapPlugin {
             {
                 let params = self.params.clone();
                 let latency = self.latency.clone();
+                let global_meter = self.global_meter.clone();
                 move |_window, gui_context| {
-                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone())
+                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone(), global_meter.clone())
                 }
             },
         );
@@ -678,6 +716,7 @@ impl Plugin for CoPiReMapPlugin {
                             *sample = (delay * if !self.params.global.global_threshold_flip.value() {self.gate.get_param_inv()} else {self.gate.get_param()}) + if gate1 { *sample } else { 0.0 };
                         }
                     }
+                    self.global_meter.store(self.gate.fast, Ordering::Release);
                 }
             }
         }

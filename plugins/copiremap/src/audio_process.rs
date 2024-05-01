@@ -24,7 +24,7 @@ pub struct AudioProcessParams {
 
     #[id = "threshold_attack"]
     pub threshold_attack: FloatParam,
-
+    
     #[id = "threshold_release"]
     pub threshold_release: FloatParam,
 

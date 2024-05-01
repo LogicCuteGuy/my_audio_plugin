@@ -7,6 +7,8 @@ export component ParameterKnob inherits Rectangle {
     in-out property <angle> max-angle:   70deg;
     in-out property <float> sensitivity: 0.25;
 
+    in property <bool> blue: false;
+
     in-out property <string> text;
 
     property <bool> changing;
@@ -28,19 +30,10 @@ export component ParameterKnob inherits Rectangle {
 
     layout := VerticalLayout {
         alignment: center;
-        spacing: 5px;
+        spacing: root.height * 6%;
 
         height: root.height;
         width: root.height;
-
-        texr := Rectangle {
-            height: 15px;
-            width: root.height;
-            Text {
-                text: " " + text + " ";
-                color: white;
-            }
-        }
 
         // Knob area
         knob := Rectangle {
@@ -49,7 +42,7 @@ export component ParameterKnob inherits Rectangle {
             border-radius: 200px;
             background: #3c230b;
             border-color: white;
-            border-width: 6px;
+            border-width: root.height * 10%;
 
             // Background arc
             Path {
@@ -57,8 +50,8 @@ export component ParameterKnob inherits Rectangle {
                 viewbox-y: -48;
                 viewbox-width: 95;
                 viewbox-height: 95;
-                stroke: #3294f0;
-                stroke-width: 8px;
+                stroke: blue ? #2778c3 : #c7a52a;
+                stroke-width: root.height * 10%;
 
                 MoveTo {
                     x: Math.cos(root.min-angle) * 50;
@@ -81,7 +74,7 @@ export component ParameterKnob inherits Rectangle {
                 viewbox-y: -50;
                 viewbox-width: 100;
                 viewbox-height: 100;
-                stroke: touch.pressed ? #d9ff4f: touch.has-hover ? #001c99 : #2f2fef;
+                stroke: blue ? (touch.pressed ? #d9ff4f: touch.has-hover ? #001c99 : #3053ff) : (touch.pressed ? #1947ff: touch.has-hover ? #817802 : #f3f32c);
                 stroke-width: 6px;
 
                 MoveTo {
@@ -103,7 +96,7 @@ export component ParameterKnob inherits Rectangle {
                 viewbox-y: -50;
                 viewbox-width: 100;
                 viewbox-height: 100;
-                stroke: touch.pressed ? #d9ff4f: touch.has-hover ? #001c99 : #2f2fef;
+                stroke: blue ? (touch.pressed ? #d9ff4f: touch.has-hover ? #001c99 : #3053ff) : (touch.pressed ? #1947ff: touch.has-hover ? #817802 : #f3f32c);
                 stroke-width: 6px;
 
                 MoveTo {
@@ -204,15 +197,15 @@ export component ParameterKnob inherits Rectangle {
         }
 
         value-field := Rectangle {
-            width: 60px;
-            height: 15px;
+            width: root.height;
+            height: root.height * 22%;
             x: root.width / 2 - self.width / 2;
             background: white.transparentize(25%);
-            border-radius: 10px;
+            border-radius: root.height * 15%;
     
             Text {
-                text: root.parameter.display-value;
-                font-size: 10px;
+                text: touch.has-hover ? root.parameter.display-value : text;
+                font-size: root.height * 18%;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -223,11 +216,11 @@ export component ParameterKnob inherits Rectangle {
     
             edit-field := Rectangle {
                 background: white;
-                border-radius: 10px;
+                border-radius: root.height * 15%;
                 visible: false;
     
                 edit-text-field := TextInput {
-                    font-size: 10px;
+                    font-size: root.height * 18%;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                     single-line: true;
