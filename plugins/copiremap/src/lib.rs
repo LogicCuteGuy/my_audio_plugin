@@ -8,6 +8,8 @@ mod gate;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
+use std::ops::Index;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
 use atomic_float::AtomicF64;
 
@@ -19,7 +21,7 @@ use nih_plug_slint::plugin_component_handle::{PluginComponentHandle, PluginCompo
 use nih_plug_slint::{WindowAttributes, editor::SlintEditor};
 use plugin_canvas::{LogicalSize, Event};
 use plugin_canvas::event::EventResponse;
-use slint::{ModelRc, SharedString};
+use slint::{ModelRc, SharedString, VecModel};
 use simple_eq::design::Curve;
 use crate::audio_process::{AudioProcess96, AudioProcessParams, PitchShiftNode};
 use crate::delay::{Delay, latency_average96};
@@ -221,11 +223,12 @@ pub struct PluginComponent {
     latency: Arc<AtomicU32>,
     gui_context: Arc<dyn GuiContext>,
     global_meter: Arc<AtomicF32>,
-    update_meter: AtomicU16,
+    note_meter: Arc<Vec<AtomicF32>>,
+    update_meter: Arc<AtomicU16>,
 }
 
 impl PluginComponent {
-    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>, global_meter: Arc<AtomicF32>) -> Self {
+    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>, global_meter: Arc<AtomicF32>, note_meter: Arc<Vec<AtomicF32>>, update_meter: Arc<AtomicU16>) -> Self {
         let component = PluginWindow::new().unwrap();
         let param_map: HashMap<SharedString, _> = params.param_map().iter()
             .map(|(name, param_ptr, _)| {
@@ -239,7 +242,8 @@ impl PluginComponent {
             latency,
             gui_context,
             global_meter,
-            update_meter: AtomicU16::new(0)
+            note_meter,
+            update_meter
         }
     }
 
@@ -287,6 +291,10 @@ impl PluginComponent {
             "note_a" => self.component.set_note_a(parameter),
             "note_a_sharp" => self.component.set_note_a_sharp(parameter),
             "note_b" => self.component.set_note_b(parameter),
+            "low_note_off" => self.component.set_low_note(parameter),
+            "high_note_off" => self.component.set_high_note(parameter),
+            "low_note_off_mute" => self.component.set_low_note_off_mute(parameter),
+            "high_note_off_mute" => self.component.set_high_note_off_mute(parameter),
             _ => (),
         }
     }
@@ -307,6 +315,8 @@ impl PluginComponentHandle for PluginComponent {
                 let update = self.update_meter.load(Ordering::SeqCst);
                 if update > 8 {
                     self.component.set_global_meter(self.global_meter.load(Ordering::SeqCst));
+                    let array: Vec<f32> = self.note_meter.iter().map(|meter| meter.load(Ordering::SeqCst)).collect();
+                    self.component.set_note_meter(ModelRc::new(Rc::new(VecModel::from(array))));
                     self.update_meter.store(0, Ordering::Release);
                 } else {
                     self.update_meter.store(update + 1, Ordering::Release);
@@ -380,7 +390,9 @@ pub struct CoPiReMapPlugin {
     user_scale: Arc<AtomicF64>,
 
     global_meter: Arc<AtomicF32>,
-    note_meter: Arc<Vec<f32>>,
+    note_meter: Arc<Vec<AtomicF32>>,
+
+    update_meter: Arc<AtomicU16>,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -403,7 +415,7 @@ impl Default for CoPiReMapPlugin {
         let mut note_meter = Vec::with_capacity(96);
         for _ in 0..96 {
             audio_process96.push(AudioProcess96::default());
-            note_meter.push(0.0);
+            note_meter.push(AtomicF32::new(0.0));
         };
 
         let latency = Arc::new(AtomicU32::new(0));
@@ -440,6 +452,7 @@ impl Default for CoPiReMapPlugin {
             user_scale: Arc::new(AtomicF64::new(1.0)),
             global_meter: Arc::new(AtomicF32::new(0.0)),
             note_meter: Arc::new(note_meter),
+            update_meter: Arc::new(AtomicU16::new(0)),
         }
     }
 }
@@ -511,8 +524,10 @@ impl Plugin for CoPiReMapPlugin {
                 let params = self.params.clone();
                 let latency = self.latency.clone();
                 let global_meter = self.global_meter.clone();
+                let note_meter = self.note_meter.clone();
+                let update_meter = self.update_meter.clone();
                 move |_window, gui_context| {
-                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone(), global_meter.clone())
+                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone(), global_meter.clone(), note_meter.clone(), update_meter.clone())
                 }
             },
         );
@@ -560,7 +575,7 @@ impl Plugin for CoPiReMapPlugin {
                     let low_note = self.params.global.low_note_off.value() as usize - 36;
                     hz_cal_clh(low_note as u8, 0, &mut lowpass, self.params.global.hz_tuning.value(), !self.params.audio_process.pitch_shift.value());
                     self.lpf.set_frequency(lowpass);
-                    self.audio_process96.iter_mut().filter(|ap| ap.note >= low_note as u8 && ap.note < ((low_note + 12) as u8)).for_each(
+                    self.audio_process96.iter_mut().for_each(
                         |ap| {
                             ap.set_pitch_shift_12_node(self.params.clone(), &self.buffer_config, &self.midi_note);
                         }
@@ -694,6 +709,9 @@ impl Plugin for CoPiReMapPlugin {
                                             if input_param > db_to_gain(-60.0) {
                                                 audio_process += ap.process_bpf(pitch[index], i, input_param, self.params.clone());
                                                 // println!("Work {}, {}", ii, ap.note);
+                                            }
+                                            if self.update_meter.load(Ordering::SeqCst) > 8 {
+                                                self.note_meter.get(ap.note as usize).unwrap().store(ap.gate.fast, Ordering::Release);
                                             }
                                             index += 1;
                                         }

@@ -27,14 +27,12 @@ impl MyGate {
             self.fast = (self.sum / buf_size as f32).sqrt();
             self.sum = 0.0;
         }
-        if self.fast == 0.0 {
-            (false, false)
-        } else if self.fast >= threshold && self.param >= 1.0 {
+        if self.fast >= threshold && self.fast != 0.0 && self.param >= 1.0 {
             (true, false)
-        } else if self.fast >= threshold {
+        } else if self.fast >= threshold && self.fast != 0.0 {
             self.param += delta_attack / 2.0; // Increase param for attack
             (true, true)
-        } else if self.fast < threshold && self.param <= 0.0 {
+        } else if (self.fast < threshold || self.fast == 0.0) && self.param <= 0.0 {
             (false, true)
         } else {
             self.param -= delta_release / 2.0; // Decrease param for release

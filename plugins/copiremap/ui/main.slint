@@ -5,13 +5,19 @@ import { ParameterButtonBypass } from "button_bypass.slint";
 import { ParameterButtonPiano } from "button_piano.slint";
 import "resource/font/Fingercute-Regular.ttf";
 import { VerticalBox, Button } from "std-widgets.slint";
+import { PianoBar } from "piano_bar.slint";
+import { ParameterButton } from "button.slint";
 
 export component PluginWindow {
+    in-out property <PluginParameter> scale-gui;
+    in-out property <PluginParameter> bypass;
     in-out property <PluginParameter> dry-gain;
     in-out property <PluginParameter> wet-gain;
     in-out property <PluginParameter> lhf-gain;
-    in-out property <PluginParameter> bypass;
-    in-out property <PluginParameter> scale-gui;
+    in-out property <PluginParameter> low-note;
+    in-out property <PluginParameter> high-note;
+    in-out property <PluginParameter> low-note-off-mute;
+    in-out property <PluginParameter> high-note-off-mute;
 
     in-out property <PluginParameter> note-c;
     in-out property <PluginParameter> note-c-sharp;
@@ -25,9 +31,10 @@ export component PluginWindow {
     in-out property <PluginParameter> note-a;
     in-out property <PluginParameter> note-a-sharp;
     in-out property <PluginParameter> note-b;
+
     
-    in-out property <float> global-meter;
-    in-out property <[float]> note-meter;
+    in property <float> global-meter;
+    in property <[float]> note-meter;
 
     property <bool> gui_changing;
     in property <int> latency;
@@ -48,9 +55,7 @@ export component PluginWindow {
                     enabled: true;
                 }
             }
-            Text {
-                text: "This is " + global-meter;
-            }
+
             VerticalLayout {
                 padding: 8px;
                 spacing: 7px;
@@ -69,8 +74,8 @@ export component PluginWindow {
                             ParameterButtonBypass {
                                 height: 50px;
                                 width: 50px;
-                                parameter: bypass;
                                 icon: @image-url("resource/img/LogicColour.png");
+                                parameter: bypass;
                                 start-change => {
                                     start-change(bypass);
                                 }
@@ -157,281 +162,347 @@ export component PluginWindow {
                         }
                     }
                 }
-
+                
                 Rectangle {
                     height: 405px;
                     border-radius: 5px;
                     background: #00000061;
                     border-color: #ffffffb5;
                     border-width: 3px;
-                    HorizontalLayout {
-                        padding: 20px;
-                        spacing: 25px;
-                        Rectangle {
-                            HorizontalLayout {
-                                padding-left: 10px;
-                                spacing: 3px;
-                                z: 1;
-                                ParameterButtonPiano {
-                                    height: 45px;
-                                    width: 25px;
-                                    parameter: note-c-sharp;
-                                    start-change => {
-                                        start-change(note-c-sharp);
-                                    }
-                                    changed(value) => {
-                                        changed(note-c-sharp, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-c-sharp);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-c-sharp, string);
-                                    }
+                    VerticalLayout {
+                        HorizontalLayout {
+                            padding: 10px;
+                            spacing: 5px;
+                            alignment: space-between;
+                            ParameterButton {
+                                height: 35px;
+                                width: 35px;
+                                icon: @image-url("resource/img/mute_icon.svg");
+                                parameter: low-note-off-mute;
+                                start-change => {
+                                    start-change(low-note-off-mute);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 45px;
-                                    width: 25px;
-                                    parameter: note-d-sharp;
-                                    start-change => {
-                                        start-change(note-d-sharp);
-                                    }
-                                    changed(value) => {
-                                        changed(note-d-sharp, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-d-sharp);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-d-sharp, string);
-                                    }
+                                changed(value) => {
+                                    changed(low-note-off-mute, value);
                                 }
-
-                                Rectangle {
-                                    height: 45px;
-                                    width: 15px;
+                                end-change => {
+                                    end-change(low-note-off-mute);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 45px;
-                                    width: 25px;
-                                    parameter: note-f-sharp;
-                                    start-change => {
-                                        start-change(note-f-sharp);
-                                    }
-                                    changed(value) => {
-                                        changed(note-f-sharp, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-f-sharp);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-f-sharp, string);
-                                    }
-                                }
-
-                                ParameterButtonPiano {
-                                    height: 45px;
-                                    width: 25px;
-                                    parameter: note-g-sharp;
-                                    start-change => {
-                                        start-change(note-g-sharp);
-                                    }
-                                    changed(value) => {
-                                        changed(note-g-sharp, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-g-sharp);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-g-sharp, string);
-                                    }
-                                }
-
-                                ParameterButtonPiano {
-                                    height: 45px;
-                                    width: 25px;
-                                    parameter: note-a-sharp;
-                                    start-change => {
-                                        start-change(note-a-sharp);
-                                    }
-                                    changed(value) => {
-                                        changed(note-a-sharp, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-a-sharp);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-a-sharp, string);
-                                    }
+                                set-string(string) => {
+                                    set-string(low-note-off-mute, string);
                                 }
                             }
 
-                            HorizontalLayout {
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-c;
-                                    start-change => {
-                                        start-change(note-c);
-                                    }
-                                    changed(value) => {
-                                        changed(note-c, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-c);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-c, string);
-                                    }
+                            PianoBar {
+                                width: parent.width - 100px;
+                                height: 35px;
+                                note-meter: note-meter;
+                                low-note: low-note;
+                                high-note: high-note;
+                                start-change(parameter) => {
+                                    start-change(parameter);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-d;
-                                    start-change => {
-                                        start-change(note-d);
-                                    }
-                                    changed(value) => {
-                                        changed(note-d, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-d);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-d, string);
-                                    }
+                                changed(parameter, value) => {
+                                    changed(parameter, value);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-e;
-                                    start-change => {
-                                        start-change(note-e);
-                                    }
-                                    changed(value) => {
-                                        changed(note-e, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-e);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-e, string);
-                                    }
+                                end-change(parameter) => {
+                                    end-change(parameter);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-f;
-                                    start-change => {
-                                        start-change(note-f);
-                                    }
-                                    changed(value) => {
-                                        changed(note-f, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-f);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-f, string);
-                                    }
+                                set-string(parameter, string) => {
+                                    set-string(parameter, string);
                                 }
+                            }
 
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-g;
-                                    start-change => {
-                                        start-change(note-g);
-                                    }
-                                    changed(value) => {
-                                        changed(note-g, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-g);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-g, string);
-                                    }
+                            ParameterButton {
+                                height: 35px;
+                                width: 35px;
+                                icon: @image-url("resource/img/mute_icon.svg");
+                                parameter: high-note-off-mute;
+                                start-change => {
+                                    start-change(high-note-off-mute);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-a;
-                                    start-change => {
-                                        start-change(note-a);
-                                    }
-                                    changed(value) => {
-                                        changed(note-a, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-a);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-a, string);
-                                    }
+                                changed(value) => {
+                                    changed(high-note-off-mute, value);
                                 }
-
-                                ParameterButtonPiano {
-                                    height: 75px;
-                                    width: 25px;
-                                    parameter: note-b;
-                                    start-change => {
-                                        start-change(note-b);
-                                    }
-                                    changed(value) => {
-                                        changed(note-b, value);
-                                    }
-                                    end-change => {
-                                        end-change(note-b);
-                                    }
-                                    set-string(string) => {
-                                        set-string(note-b, string);
-                                    }
+                                end-change => {
+                                    end-change(high-note-off-mute);
+                                }
+                                set-string(string) => {
+                                    set-string(high-note-off-mute, string);
                                 }
                             }
                         }
-
-                        // ParameterKnob {
-                        //     height: 50px;
-                        //     parameter: gain;
-                        //     text: "Gain";
-                        //     // FIXME: Callbacks need to be mapped manually
-                        //     start-change => { start-change(gain); }
-                        //     changed(value) => { changed(gain, value); }
-                        //     end-change => { end-change(gain); }
-                        //     set-string(string) => { set-string(gain, string); }
-                        // }
-
-                        // ParameterKnob {
-                        //     height: 10px;
-                        //     parameter: gain;
-        
-                        //     // FIXME: Callbacks need to be mapped manually
-                        //     start-change => { start-change(gain); }
-                        //     changed(value) => { changed(gain, value); }
-                        //     end-change => { end-change(gain); }
-                        //     set-string(string) => { set-string(gain, string); }
-                        // }
-
-                        // ParameterSlider {
-                        //     height: 10px;
-                        //     width: 100px;
-                        //     parameter: gain;
-            
-                        //     // FIXME: Callbacks need to be mapped manually
-                        //     start-change => { start-change(gain); }
-                        //     changed(value) => { changed(gain, value); }
-                        //     end-change => { end-change(gain); }
-                        //     set-string(string) => { set-string(gain, string); }
-                        // }
                         
+                        HorizontalLayout {
+                            padding: 20px;
+                            spacing: 25px;
+                            Rectangle {
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    spacing: 3px;
+                                    z: 1;
+                                    ParameterButtonPiano {
+                                        height: 45px;
+                                        width: 25px;
+                                        parameter: note-c-sharp;
+                                        start-change => {
+                                            start-change(note-c-sharp);
+                                        }
+                                        changed(value) => {
+                                            changed(note-c-sharp, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-c-sharp);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-c-sharp, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 45px;
+                                        width: 25px;
+                                        parameter: note-d-sharp;
+                                        start-change => {
+                                            start-change(note-d-sharp);
+                                        }
+                                        changed(value) => {
+                                            changed(note-d-sharp, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-d-sharp);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-d-sharp, string);
+                                        }
+                                    }
+    
+                                    Rectangle {
+                                        height: 45px;
+                                        width: 15px;
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 45px;
+                                        width: 25px;
+                                        parameter: note-f-sharp;
+                                        start-change => {
+                                            start-change(note-f-sharp);
+                                        }
+                                        changed(value) => {
+                                            changed(note-f-sharp, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-f-sharp);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-f-sharp, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 45px;
+                                        width: 25px;
+                                        parameter: note-g-sharp;
+                                        start-change => {
+                                            start-change(note-g-sharp);
+                                        }
+                                        changed(value) => {
+                                            changed(note-g-sharp, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-g-sharp);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-g-sharp, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 45px;
+                                        width: 25px;
+                                        parameter: note-a-sharp;
+                                        start-change => {
+                                            start-change(note-a-sharp);
+                                        }
+                                        changed(value) => {
+                                            changed(note-a-sharp, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-a-sharp);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-a-sharp, string);
+                                        }
+                                    }
+                                }
+    
+                                HorizontalLayout {
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-c;
+                                        start-change => {
+                                            start-change(note-c);
+                                        }
+                                        changed(value) => {
+                                            changed(note-c, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-c);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-c, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-d;
+                                        start-change => {
+                                            start-change(note-d);
+                                        }
+                                        changed(value) => {
+                                            changed(note-d, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-d);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-d, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-e;
+                                        start-change => {
+                                            start-change(note-e);
+                                        }
+                                        changed(value) => {
+                                            changed(note-e, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-e);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-e, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-f;
+                                        start-change => {
+                                            start-change(note-f);
+                                        }
+                                        changed(value) => {
+                                            changed(note-f, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-f);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-f, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-g;
+                                        start-change => {
+                                            start-change(note-g);
+                                        }
+                                        changed(value) => {
+                                            changed(note-g, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-g);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-g, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-a;
+                                        start-change => {
+                                            start-change(note-a);
+                                        }
+                                        changed(value) => {
+                                            changed(note-a, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-a);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-a, string);
+                                        }
+                                    }
+    
+                                    ParameterButtonPiano {
+                                        height: 75px;
+                                        width: 25px;
+                                        parameter: note-b;
+                                        start-change => {
+                                            start-change(note-b);
+                                        }
+                                        changed(value) => {
+                                            changed(note-b, value);
+                                        }
+                                        end-change => {
+                                            end-change(note-b);
+                                        }
+                                        set-string(string) => {
+                                            set-string(note-b, string);
+                                        }
+                                    }
+                                }
+                            }
+    
+                            // ParameterKnob {
+                            //     height: 50px;
+                            //     parameter: gain;
+                            //     text: "Gain";
+                            //     // FIXME: Callbacks need to be mapped manually
+                            //     start-change => { start-change(gain); }
+                            //     changed(value) => { changed(gain, value); }
+                            //     end-change => { end-change(gain); }
+                            //     set-string(string) => { set-string(gain, string); }
+                            // }
+    
+                            // ParameterKnob {
+                            //     height: 10px;
+                            //     parameter: gain;
+            
+                            //     // FIXME: Callbacks need to be mapped manually
+                            //     start-change => { start-change(gain); }
+                            //     changed(value) => { changed(gain, value); }
+                            //     end-change => { end-change(gain); }
+                            //     set-string(string) => { set-string(gain, string); }
+                            // }
+    
+                            // ParameterSlider {
+                            //     height: 10px;
+                            //     width: 100px;
+                            //     parameter: gain;
+                
+                            //     // FIXME: Callbacks need to be mapped manually
+                            //     start-change => { start-change(gain); }
+                            //     changed(value) => { changed(gain, value); }
+                            //     end-change => { end-change(gain); }
+                            //     set-string(string) => { set-string(gain, string); }
+                            // }
+                            
+                        }
                     }
+                    
                 }
             }
 
