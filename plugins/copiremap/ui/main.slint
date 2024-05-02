@@ -32,10 +32,6 @@ export component PluginWindow {
     in-out property <PluginParameter> note-a-sharp;
     in-out property <PluginParameter> note-b;
 
-    
-    in property <float> global-meter;
-    in property <[float]> note-meter;
-
     property <bool> gui_changing;
     in property <int> latency;
     callback start-change(PluginParameter);
@@ -196,7 +192,6 @@ export component PluginWindow {
                             PianoBar {
                                 width: parent.width - 100px;
                                 height: 35px;
-                                note-meter: note-meter;
                                 low-note: low-note;
                                 high-note: high-note;
                                 start-change(parameter) => {

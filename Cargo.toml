@@ -25,7 +25,7 @@ realfft = "3.3.0"
 num-complex = "0.4.5"
 num-traits = "0.2.18"
 thiserror = "1.0.58"
-rust-music-theory = "0.2.0"
+#rust-music-theory = "0.2.0"
 serde = { version = "1.0.198", features = ["derive"] }
 crossbeam = "0.8.4"
 atomic_float = "0.1.0"

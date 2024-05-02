@@ -3,7 +3,7 @@ use nih_plug::audio_setup::BufferConfig;
 pub struct MyGate {
     pub fast: f32,
     sum: f32,
-    param: f32,
+    pub param: f32,
     count: u16
 }
 
@@ -17,7 +17,7 @@ impl MyGate {
         }
     }
 
-    pub fn update_fast_param(&mut self, sample: f32, buffer_config: &BufferConfig, threshold: f32, attack_ms: f32, release_ms: f32, buf_size: usize) -> (bool, bool) {
+    pub fn update_fast_param(&mut self, sample: f32, buffer_config: &BufferConfig, threshold: f32, attack_ms: f32, release_ms: f32, buf_size: usize, flip: bool) -> (bool, bool) {
         self.sum += sample * sample;
         let delta_attack = (1.0 / (attack_ms * 0.001 * buffer_config.sample_rate * buf_size as f32)).min(1.0); // Change per sample for attack
         let delta_release = (1.0 / (release_ms * 0.001 * buffer_config.sample_rate * buf_size as f32)).min(1.0); // Change per sample for release
@@ -27,24 +27,24 @@ impl MyGate {
             self.fast = (self.sum / buf_size as f32).sqrt();
             self.sum = 0.0;
         }
-        if self.fast >= threshold && self.fast != 0.0 && self.param >= 1.0 {
-            (true, false)
-        } else if self.fast >= threshold && self.fast != 0.0 {
+        if self.fast >= threshold && self.param >= 1.0 {
+            (!flip, flip)
+        } else if self.fast >= threshold{
             self.param += delta_attack / 2.0; // Increase param for attack
             (true, true)
-        } else if (self.fast < threshold || self.fast == 0.0) && self.param <= 0.0 {
-            (false, true)
+        } else if self.fast < threshold && self.param <= 0.0 {
+            (flip, !flip)
         } else {
             self.param -= delta_release / 2.0; // Decrease param for release
             (true, true)
         }
     }
 
-    pub fn get_param(&self) -> f32 {
-        self.param
+    pub fn get_param(&self, flip: bool) -> f32 {
+        if flip {1.0 - self.param} else {self.param}
     }
 
-    pub fn get_param_inv(&self) -> f32 {
-        1.0 - self.param
+    pub fn get_param_inv(&self, flip: bool) -> f32 {
+        if flip {self.param} else {1.0 - self.param}
     }
 }

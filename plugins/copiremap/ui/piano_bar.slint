@@ -9,9 +9,7 @@ export component PianoBar inherits Rectangle {
     callback changed(PluginParameter, float);
     callback end-change(PluginParameter);
     callback set-string(PluginParameter, string);
-    in property <bool> blue: false;
     in property <bool> vertical: false;
-    in property <[float]> note-meter: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
 
     width: 100px;
     height: 100px;
@@ -45,22 +43,17 @@ export component PianoBar inherits Rectangle {
             border-width: 20px;
             border-color: beige;
             HorizontalLayout {
-                for data[index] in note-meter: piano := Rectangle {
+                for index in 96: piano := Rectangle {
                     width: root.width / 96;
                     property <int> cal: Math.mod(index, 12);
                     background: cal == 1 || cal == 3 || cal == 6 || cal == 8 || cal == 10 ? black : white;
-                    Rectangle {
-                        height: 1px;
-                        y: parent.height * data;
-                        background: green;
-                    }
                 }
             }
             handle := Rectangle {
                 height: root.height;
                 width: root.width / 96;
                 border-width: 3px;
-                background: blue ? (touch.pressed ? #d9ff4f: touch.has-hover ? #001c99 : #2f2fef) : (touch.pressed ? #1947ff: touch.has-hover ? #817802 : #f3f32c);
+                background: touch.pressed ? #d9ff4f: touch.has-hover ? #001c99 : #2f2fef;
                 border-color: self.background.darker(15%);
                 y: vertical ? (root.width - self.width) * root.low-note.value : 0;
                 x: vertical ? 0 : (root.width - self.width) * root.low-note.value;
@@ -99,7 +92,7 @@ export component PianoBar inherits Rectangle {
                 height: root.height;
                 width: root.width / 96;
                 border-width: 3px;
-                background: blue ? (touch2.pressed ? #d9ff4f: touch2.has-hover ? #001c99 : #2f2fef) : (touch2.pressed ? #1947ff: touch2.has-hover ? #817802 : #f3f32c);
+                background: touch2.pressed ? #1947ff: touch2.has-hover ? #817802 : #f3f32c;
                 border-color: self.background.darker(15%);
                 y: vertical ? (root.width - self.width) * root.high-note.value : 0;
                 x: vertical ? 0 : (root.width - self.width) * root.high-note.value;

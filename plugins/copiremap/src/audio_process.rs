@@ -182,7 +182,7 @@ pub struct AudioProcess96 {
     pub tuning: Option<MyPitch>,
     delay: Delay,
     pub(crate) gate: MyGate,
-    open: (bool, bool),
+    open: bool,
     pub note: u8,
     pub note_pitch: i8,
 }
@@ -293,7 +293,7 @@ impl AudioProcess96 {
     }
 
     pub fn process(&mut self, input: f32, params: Arc<PluginParams>, audio_id: usize, input_param: f32, buffer_config: &BufferConfig, buf_size: usize) -> f32 {
-        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !!(params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node12 || self.open.0 && !params.audio_process.threshold_flip.value() || self.open.1 && params.audio_process.threshold_flip.value()) {
+        let pitch: f32 = match params.audio_process.pitch_shift.value() && !(self.note_pitch == 0 || self.note_pitch == -128) && !!(params.audio_process.pitch_shift_node.value() == PitchShiftNode::Node12 || self.open) {
             true => match self.tuning.as_mut() {
                 None => {
                     0.0
@@ -323,9 +323,10 @@ impl AudioProcess96 {
                 }
             }
         };
-        self.open = self.gate.update_fast_param(bpf, buffer_config, params.audio_process.threshold.value(), params.audio_process.threshold_attack.value(), params.audio_process.threshold_release.value(), buf_size);
+        let flip = params.audio_process.threshold_flip.value();
+        self.open = self.gate.update_fast_param(bpf, buffer_config, params.audio_process.threshold.value(), params.audio_process.threshold_attack.value(), params.audio_process.threshold_release.value(), buf_size, flip).0;
         // output = if self.note_pitch == -128 { 0.0 } else { output };
-        bpf * if !params.audio_process.threshold_flip.value() {self.gate.get_param()} else {self.gate.get_param_inv()}
+        bpf * self.gate.get_param(flip)
     }
 
     pub fn process_bpf(&mut self, input: f32, audio_id: usize, input_param: f32, params: Arc<PluginParams>) -> f32 {
@@ -347,7 +348,7 @@ impl Default for AudioProcess96 {
             tuning: None,
             delay: Delay::default(),
             gate: MyGate::new(),
-            open: (false, false),
+            open: false,
             note: 0,
             note_pitch: 0,
         }

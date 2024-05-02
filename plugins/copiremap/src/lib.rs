@@ -8,11 +8,8 @@ mod gate;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
-use std::ops::Index;
-use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use atomic_float::AtomicF64;
-
 use nih_plug::util::db_to_gain;
 use nih_plug::{nih_export_clap, nih_export_vst3};
 use nih_plug::params::persist::PersistentField;
@@ -21,7 +18,7 @@ use nih_plug_slint::plugin_component_handle::{PluginComponentHandle, PluginCompo
 use nih_plug_slint::{WindowAttributes, editor::SlintEditor};
 use plugin_canvas::{LogicalSize, Event};
 use plugin_canvas::event::EventResponse;
-use slint::{ModelRc, SharedString, VecModel};
+use slint::{SharedString, VecModel};
 use simple_eq::design::Curve;
 use crate::audio_process::{AudioProcess96, AudioProcessParams, PitchShiftNode};
 use crate::delay::{Delay, latency_average96};
@@ -222,13 +219,10 @@ pub struct PluginComponent {
     param_map: HashMap<SharedString, ParamPtr>,
     latency: Arc<AtomicU32>,
     gui_context: Arc<dyn GuiContext>,
-    global_meter: Arc<AtomicF32>,
-    note_meter: Arc<Vec<AtomicF32>>,
-    update_meter: Arc<AtomicU16>,
 }
 
 impl PluginComponent {
-    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>, global_meter: Arc<AtomicF32>, note_meter: Arc<Vec<AtomicF32>>, update_meter: Arc<AtomicU16>) -> Self {
+    fn new(params: Arc<PluginParams>, latency: Arc<AtomicU32>, gui_context: Arc<dyn GuiContext>) -> Self {
         let component = PluginWindow::new().unwrap();
         let param_map: HashMap<SharedString, _> = params.param_map().iter()
             .map(|(name, param_ptr, _)| {
@@ -240,10 +234,7 @@ impl PluginComponent {
             component,
             param_map,
             latency,
-            gui_context,
-            global_meter,
-            note_meter,
-            update_meter
+            gui_context
         }
     }
 
@@ -309,24 +300,8 @@ impl PluginComponentHandle for PluginComponent {
         &self.param_map
     }
 
-    fn on_event(&self, event: &Event) -> EventResponse {
-        match event {
-            Event::Draw => {
-                let update = self.update_meter.load(Ordering::SeqCst);
-                if update > 8 {
-                    self.component.set_global_meter(self.global_meter.load(Ordering::SeqCst));
-                    let array: Vec<f32> = self.note_meter.iter().map(|meter| meter.load(Ordering::SeqCst)).collect();
-                    self.component.set_note_meter(ModelRc::new(Rc::new(VecModel::from(array))));
-                    self.update_meter.store(0, Ordering::Release);
-                } else {
-                    self.update_meter.store(update + 1, Ordering::Release);
-                }
-                EventResponse::Ignored
-            },
-            _ => {
-                EventResponse::Ignored
-            }
-        }
+    fn on_event(&self, _event: &Event) -> EventResponse {
+        EventResponse::Ignored
     }
 
     fn update_parameter_value(&self, id: &str) {
@@ -388,11 +363,6 @@ pub struct CoPiReMapPlugin {
 
     latency: Arc<AtomicU32>,
     user_scale: Arc<AtomicF64>,
-
-    global_meter: Arc<AtomicF32>,
-    note_meter: Arc<Vec<AtomicF32>>,
-
-    update_meter: Arc<AtomicU16>,
 }
 
 impl Default for CoPiReMapPlugin {
@@ -412,10 +382,8 @@ impl Default for CoPiReMapPlugin {
         let update_gui_scale = Arc::new(AtomicBool::new(false));
 
         let mut audio_process96 = Vec::with_capacity(96);
-        let mut note_meter = Vec::with_capacity(96);
         for _ in 0..96 {
             audio_process96.push(AudioProcess96::default());
-            note_meter.push(AtomicF32::new(0.0));
         };
 
         let latency = Arc::new(AtomicU32::new(0));
@@ -449,10 +417,7 @@ impl Default for CoPiReMapPlugin {
             update_key_note_12,
             update_gui_scale,
             latency,
-            user_scale: Arc::new(AtomicF64::new(1.0)),
-            global_meter: Arc::new(AtomicF32::new(0.0)),
-            note_meter: Arc::new(note_meter),
-            update_meter: Arc::new(AtomicU16::new(0)),
+            user_scale: Arc::new(AtomicF64::new(1.0))
         }
     }
 }
@@ -523,11 +488,8 @@ impl Plugin for CoPiReMapPlugin {
             {
                 let params = self.params.clone();
                 let latency = self.latency.clone();
-                let global_meter = self.global_meter.clone();
-                let note_meter = self.note_meter.clone();
-                let update_meter = self.update_meter.clone();
                 move |_window, gui_context| {
-                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone(), global_meter.clone(), note_meter.clone(), update_meter.clone())
+                    PluginComponent::new(params.clone(), latency.clone(), gui_context.clone())
                 }
             },
         );
@@ -687,10 +649,9 @@ impl Plugin for CoPiReMapPlugin {
                 for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
                     let size = channel.len();
                     for sample in channel.iter_mut() {
-                        let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, &self.buffer_config, self.params.global.global_threshold.value(), self.params.global.global_threshold_attack.value(), self.params.global.global_threshold_release.value(), size);
+                        let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, &self.buffer_config, self.params.global.global_threshold.value(), self.params.global.global_threshold_attack.value(), self.params.global.global_threshold_release.value(), size, self.params.global.global_threshold_flip.value());
                         let delay = self.delay.process(*sample, i);
-                        let gate1 = (gate_on.0 && !self.params.global.global_threshold_flip.value()) || (gate_on.1 && self.params.global.global_threshold_flip.value());
-                        if gate1 {
+                        if gate_on.0 {
                             let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => self.lpf.process(delay, i) };
                             let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => self.hpf.process(delay, i) };
                             match self.params.audio_process.pitch_shift_node.value() {
@@ -710,9 +671,6 @@ impl Plugin for CoPiReMapPlugin {
                                                 audio_process += ap.process_bpf(pitch[index], i, input_param, self.params.clone());
                                                 // println!("Work {}, {}", ii, ap.note);
                                             }
-                                            if self.update_meter.load(Ordering::SeqCst) > 8 {
-                                                self.note_meter.get(ap.note as usize).unwrap().store(ap.gate.fast, Ordering::Release);
-                                            }
                                             index += 1;
                                         }
                                     );
@@ -726,15 +684,13 @@ impl Plugin for CoPiReMapPlugin {
                                     );
                                 }
                             }
-                            *sample = ((audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value())) * if self.params.global.global_threshold_flip.value() {self.gate.get_param_inv()} else {self.gate.get_param()};
+                            *sample = ((audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value())) * self.gate.get_param(self.params.audio_process.threshold_flip.value());
                             audio_process = 0.0;
                         }
-                        let gate2 = (gate_on.1 && !self.params.global.global_threshold_flip.value()) || (gate_on.0 && self.params.global.global_threshold_flip.value());
-                        if gate2 {
-                            *sample = (delay * if !self.params.global.global_threshold_flip.value() {self.gate.get_param_inv()} else {self.gate.get_param()}) + if gate1 { *sample } else { 0.0 };
+                        if gate_on.1 {
+                            *sample = (delay * self.gate.get_param_inv(self.params.audio_process.threshold_flip.value())) + if gate_on.0 { *sample } else { 0.0 };
                         }
                     }
-                    self.global_meter.store(self.gate.fast, Ordering::Release);
                 }
             }
         }

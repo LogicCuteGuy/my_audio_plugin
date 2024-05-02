@@ -10,6 +10,7 @@ export component ParameterSlider inherits Rectangle {
     callback set-string(string);
     in property <bool> blue: false;
     in property <bool> vertical: false;
+    in property <bool> switch;
     in-out property <string> text;
     
     border-color: root.background.darker(25%);
@@ -62,6 +63,9 @@ export component ParameterSlider inherits Rectangle {
                 property <float> pressed-value;
                 double-clicked => {
                     root.changed(root.parameter.default-value);
+                }
+                clicked => {
+                    root.changed(root.parameter.value == 1.0 ? 0.0 : 1.0);
                 }
                 pointer-event(event) => {
                     if (event.button == PointerEventButton.left) {
