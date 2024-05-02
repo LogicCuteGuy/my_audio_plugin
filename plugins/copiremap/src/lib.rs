@@ -131,18 +131,18 @@ impl GlobalParams {
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            global_threshold: FloatParam::new("Global Threshold", db_to_gain(0.0), FloatRange::Linear {
+            global_threshold: FloatParam::new("Global Threshold", db_to_gain(-90.0), FloatRange::Linear {
                 min: db_to_gain(-100.0),
                 max: db_to_gain(0.0),
             }).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            global_threshold_flip: BoolParam::new("Global Threshold Flip", true),
-            global_threshold_attack: FloatParam::new("Global Threshold Attack", 1.0, FloatRange::Linear {
+            global_threshold_flip: BoolParam::new("Global Threshold Flip", false),
+            global_threshold_attack: FloatParam::new("Global Threshold Attack", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
             }).with_unit("ms.mb"),
-            global_threshold_release: FloatParam::new("Global Threshold Release", 1.0, FloatRange::Linear {
+            global_threshold_release: FloatParam::new("Global Threshold Release", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
             }).with_unit("ms.mb"),

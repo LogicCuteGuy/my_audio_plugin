@@ -59,7 +59,7 @@ impl AudioProcessParams {
         Self {
             threshold: FloatParam::new(
                 "Threshold",
-                db_to_gain(0.0),
+                db_to_gain(-90.0),
                 FloatRange::Linear {
                     min: db_to_gain(-100.0),
                     max: db_to_gain(0.0),
@@ -67,12 +67,12 @@ impl AudioProcessParams {
             ).with_unit(" dB")
                 .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
                 .with_string_to_value(formatters::s2v_f32_gain_to_db()),
-            threshold_flip: BoolParam::new("Threshold Flip", true),
-            threshold_attack: FloatParam::new("Threshold Attack", 1.0, FloatRange::Linear {
+            threshold_flip: BoolParam::new("Threshold Flip", false),
+            threshold_attack: FloatParam::new("Threshold Attack", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
             }).with_unit("ms.mb"),
-            threshold_release: FloatParam::new("Threshold Release", 1.0, FloatRange::Linear {
+            threshold_release: FloatParam::new("Threshold Release", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
             }).with_unit("ms.mb"),
