@@ -18,10 +18,10 @@ use crate::pitch::MyPitch;
 pub struct AudioProcessParams {
     #[id = "threshold"]
     pub threshold: FloatParam,
-
+    
     #[id = "threshold_flip"]
     pub threshold_flip: BoolParam,
-
+    
     #[id = "threshold_attack"]
     pub threshold_attack: FloatParam,
     
@@ -324,9 +324,9 @@ impl AudioProcess96 {
             }
         };
         let flip = params.audio_process.threshold_flip.value();
-        self.open = self.gate.update_fast_param(bpf, buffer_config, params.audio_process.threshold.value(), params.audio_process.threshold_attack.value(), params.audio_process.threshold_release.value(), buf_size, flip).0;
+        self.open = self.gate.update_fast_param(bpf, buffer_config, params.audio_process.threshold.value(), params.audio_process.threshold_attack.value(), params.audio_process.threshold_release.value(), buf_size, flip, audio_id).0;
         // output = if self.note_pitch == -128 { 0.0 } else { output };
-        bpf * self.gate.get_param(flip)
+        bpf * self.gate.get_param(flip, audio_id)
     }
 
     pub fn process_bpf(&mut self, input: f32, audio_id: usize, input_param: f32, params: Arc<PluginParams>) -> f32 {

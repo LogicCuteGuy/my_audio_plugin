@@ -347,6 +347,7 @@ pub struct CoPiReMapPlugin {
     hpf: MyFilter,
     delay: Delay,
     gate: MyGate,
+    zero: MyGate,
     update_lowpass: Arc<AtomicBool>,
     update_highpass: Arc<AtomicBool>,
 
@@ -406,6 +407,7 @@ impl Default for CoPiReMapPlugin {
             hpf: MyFilter::default(),
             delay: Delay::default(),
             gate: MyGate::new(),
+            zero: MyGate::new(),
             update_lowpass,
             update_highpass,
             update_pitch_shift_and_after_bandpass,
@@ -649,9 +651,11 @@ impl Plugin for CoPiReMapPlugin {
                 for (i, channel) in buffer.as_slice().iter_mut().enumerate() {
                     let size = channel.len();
                     for sample in channel.iter_mut() {
-                        let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, &self.buffer_config, self.params.global.global_threshold.value(), self.params.global.global_threshold_attack.value(), self.params.global.global_threshold_release.value(), size, self.params.global.global_threshold_flip.value());
+                        let flip = self.params.global.global_threshold_flip.value();
+                        let gate_zero = self.zero.update_fast_param(*sample, &self.buffer_config, db_to_gain(-99.0), 0.1, 0.1, size,false, i);
+                        let gate_on: (bool, bool) = self.gate.update_fast_param(*sample, &self.buffer_config, self.params.global.global_threshold.value(), self.params.global.global_threshold_attack.value(), self.params.global.global_threshold_release.value(), size, flip, i);
                         let delay = self.delay.process(*sample, i);
-                        if gate_on.0 {
+                        if gate_on.0 && gate_zero.0 {
                             let lpf_mute = match self.params.global.low_note_off_mute.value() { true => 0.0, false => self.lpf.process(delay, i) };
                             let hpf_mute = match self.params.global.high_note_off_mute.value() { true => 0.0, false => self.hpf.process(delay, i) };
                             match self.params.audio_process.pitch_shift_node.value() {
@@ -684,11 +688,11 @@ impl Plugin for CoPiReMapPlugin {
                                     );
                                 }
                             }
-                            *sample = ((audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value())) * self.gate.get_param(self.params.audio_process.threshold_flip.value());
+                            *sample = (((audio_process * self.params.global.wet_gain.value()) + (delay * self.params.global.dry_gain.value()) + ((lpf_mute + hpf_mute) * self.params.global.lhf_gain.value())) * self.gate.get_param(flip, i)) * self.zero.get_param(false, i);
                             audio_process = 0.0;
                         }
-                        if gate_on.1 {
-                            *sample = (delay * self.gate.get_param_inv(self.params.audio_process.threshold_flip.value())) + if gate_on.0 { *sample } else { 0.0 };
+                        if gate_on.1 || gate_zero.1 {
+                            *sample = (delay * self.gate.get_param_inv(flip, i)) + if gate_on.0 && gate_zero.0 { *sample } else { 0.0 };
                         }
                     }
                 }
