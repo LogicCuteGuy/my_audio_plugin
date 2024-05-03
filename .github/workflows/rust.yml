@@ -64,6 +64,7 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: |
           rustup target add x86_64-apple-darwin
+          xcode-select --install
           sudo open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg
       - name: Package all targets from bundler.toml
         # Instead of hardcoding which targets to build and package, we'll
