@@ -26,3 +26,10 @@ jobs:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo run --package xtask --bin xtask bundle CoPiReMap --release
+    - name: Zip artifact for deployment
+      run: zip CoPiReMap_MacOS_x86_64.zip ./target/bundled/* -r
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v2
+      with:
+        name: macOS
+        path: CoPiReMap_MacOS_x86_64.zip

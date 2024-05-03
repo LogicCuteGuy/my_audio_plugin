@@ -1,4 +1,5 @@
 use std::{rc::Rc, sync::{mpsc::{self, Sender}, Arc, Mutex}, os::fd::{AsRawFd, BorrowedFd}, time::{Instant, Duration}, ffi::OsStr};
+use std::sync::atomic::Ordering;
 
 use cursor_icon::CursorIcon;
 use nix::poll::{poll, PollFd, PollFlags};
@@ -146,7 +147,7 @@ impl OsWindow {
         set_input_focus: Arc<Mutex<Option<bool>>>,
     ) -> Result<(xcb::Connection, x::Window, xkb::State, xkb::compose::State), Error> {
         let parent_window_id = unsafe { x::Window::new(parent_window_id) };
-        let size = Size::with_logical_size(window_attributes.size, window_attributes.user_scale);
+        let size = Size::with_logical_size(window_attributes.size, window_attributes.user_scale.load(Ordering::SeqCst));
     
         let (connection, screen_number) = xcb::Connection::connect_with_xlib_display_and_extensions(
             &[], // Mandatory
@@ -277,7 +278,7 @@ impl OsWindow {
                 let position = PhysicalPosition {
                     x: event.event_x() as i32,
                     y: event.event_y() as i32,
-                }.to_logical(context.window_attributes.user_scale);
+                }.to_logical(context.window_attributes.user_scale.load(Ordering::SeqCst));
 
                 if let Some(button) = Self::mouse_button_from_detail(event.detail()) {
                     (context.event_callback)(Event::MouseButtonDown {
@@ -303,7 +304,7 @@ impl OsWindow {
                 let position = PhysicalPosition {
                     x: event.event_x() as i32,
                     y: event.event_y() as i32,
-                }.to_logical(context.window_attributes.user_scale);
+                }.to_logical(context.window_attributes.user_scale.load(Ordering::SeqCst));
 
                 if let Some(button) = Self::mouse_button_from_detail(event.detail()) {
                     (context.event_callback)(Event::MouseButtonUp {
@@ -365,7 +366,7 @@ impl OsWindow {
                 let position = PhysicalPosition {
                     x: event.event_x() as i32,
                     y: event.event_y() as i32,
-                }.to_logical(context.window_attributes.user_scale);
+                }.to_logical(context.window_attributes.user_scale.load(Ordering::SeqCst));
 
                 (context.event_callback)(Event::MouseMoved { position });
             }
