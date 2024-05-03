@@ -57,12 +57,9 @@ jobs:
         # Needed for SIMD
         uses: dtolnay/rust-toolchain@nightly
         with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-        env:
-          RUSTFLAGS: "-C target-cpu=native"  # Ensure target CPU is set appropriately
-          PATH: ${{ env.CARGO_HOME }}/bin:${{ env.PATH }}
+          # The macOS AArch64 build is done from an x86_64 macOS CI runner, so
+          # it needs to be cross compiled
+          targets: ${{ matrix.cross-target }}
       - name: Install target
         run: rustup target add x86_64-apple-darwin
       - name: Package all targets from bundler.toml
