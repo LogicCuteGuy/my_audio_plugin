@@ -1,4 +1,6 @@
 use std::{ffi::c_void, ops::{Deref, DerefMut}, path::PathBuf, sync::atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering}};
+use std::sync::Arc;
+use atomic_float::AtomicF64;
 
 use icrate::{AppKit::{NSView, NSEvent, NSEventModifierFlagShift, NSEventModifierFlagCommand, NSEventModifierFlagControl, NSEventModifierFlagOption, NSDraggingInfo, NSDragOperation, NSDragOperationNone, NSDragOperationCopy, NSDragOperationMove, NSPasteboardTypeFileURL, NSDragOperationLink}, Foundation::{NSRect, NSArray, CGPoint, NSURL}};
 use objc2::{declare::ClassBuilder, ffi::objc_disposeClassPair, msg_send, runtime::{AnyClass, Bool}, sel, ClassType, Encode, Encoding, Message, RefEncode};
@@ -217,14 +219,11 @@ impl OsWindowView {
 
     fn window_point_to_position(&self, point_in_window: CGPoint) -> LogicalPosition {
         let local_position = self.convertPoint_fromView(point_in_window, None);
-        let user_scale = match self.with_os_window(|os_window| os_window.window_attributes().user_scale) {
-            Some(scale) => scale,
-            None => 1.0,
-        };
+        let user_scale = self.with_os_window(|os_window| os_window.window_attributes().user_scale).unwrap_or_else(|| Arc::new(AtomicF64::new(0.0)));
 
         LogicalPosition {
-            x: local_position.x / user_scale,
-            y: local_position.y / user_scale,
+            x: local_position.x / user_scale.load(Ordering::SeqCst),
+            y: local_position.y / user_scale.load(Ordering::SeqCst),
         }
     }
 

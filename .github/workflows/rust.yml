@@ -10,14 +10,14 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  linux:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo run --package xtask --bin xtask bundle CoPiReMap --release
+#  linux:
+#
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: Build
+#      run: cargo run --package xtask --bin xtask bundle CoPiReMap --release
   macos:
 
     runs-on: macos-latest
