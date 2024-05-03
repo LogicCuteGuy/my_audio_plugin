@@ -29,12 +29,12 @@ jobs:
       - name: Fetch all git history
         run: git fetch --force --prune --tags --unshallow
 
-      - name: Install dependencies
+      - name: Install dependencies Ubuntu
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libgl-dev libjack-dev libx11-xcb-dev  libxcb1-dev libxcb-dri2-0-dev libxcb-icccm4-dev libxcursor-dev libxkbcommon-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-x11-dev
-      - uses: actions/cache@v3
+      - name: Install dependencies MacOS
         if: startsWith(matrix.os, 'macos')
         run: |
           rustup target add x86_64-apple-darwin
