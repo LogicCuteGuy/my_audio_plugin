@@ -71,11 +71,11 @@ impl AudioProcessParams {
             threshold_attack: FloatParam::new("Threshold Attack", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms.mb"),
+            }).with_unit("ms"),
             threshold_release: FloatParam::new("Threshold Release", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms.mb"),
+            }).with_unit("ms"),
             resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 300.0 })
                 .with_callback(
                     {
@@ -170,10 +170,10 @@ impl AudioProcessParams {
 #[non_exhaustive]
 pub enum PitchShiftNode {
     #[id = "96_node"]
-    #[name = "96 Node"]
+    #[name = "96"]
     Node96,
     #[id = "12_node"]
-    #[name = "12 Node"]
+    #[name = "12"]
     Node12,
 }
 

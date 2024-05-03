@@ -141,11 +141,11 @@ impl GlobalParams {
             global_threshold_attack: FloatParam::new("Global Threshold Attack", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms.mb"),
+            }).with_unit("ms"),
             global_threshold_release: FloatParam::new("Global Threshold Release", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms.mb"),
+            }).with_unit("ms"),
             low_note_off: IntParam::new(
                 "Low Note Off",
                 36,
@@ -262,9 +262,13 @@ impl PluginComponent {
                 self.gui_context.request_resize();
                 self.component.set_scale_gui(parameter)
             },
-            "pitch_shift_over_sampling" => self.component.set_latency(latency as i32),
+            "pitch_shift_over_sampling" => {
+                self.component.set_latency(latency as i32);
+                self.component.set_pitch_shift_over_sampling(parameter);
+            },
             "pitch_shift_window_duration_ms" => {
                 self.component.set_latency(latency as i32);
+                self.component.set_pitch_shift_window_duration_ms(parameter);
             },
             "bypass" => self.component.set_bypass(parameter),
             "dry_gain" => self.component.set_dry_gain(parameter),
@@ -286,6 +290,26 @@ impl PluginComponent {
             "high_note_off" => self.component.set_high_note(parameter),
             "low_note_off_mute" => self.component.set_low_note_off_mute(parameter),
             "high_note_off_mute" => self.component.set_high_note_off_mute(parameter),
+            "hz_center" => self.component.set_hz_center(parameter),
+            "hz_tuning" => self.component.set_hz_tuning(parameter),
+            "note_mode_midi" => self.component.set_note_mode_midi(parameter),
+            "mute_off_key" => self.component.set_mute_off_key(parameter),
+            "round_up" => self.component.set_round_up(parameter),
+            "find_off_key" => self.component.set_find_off_key(parameter),
+            "in_key_gain" => self.component.set_in_key_gain(parameter),
+            "tuning_gain" => self.component.set_tuning_gain(parameter),
+            "off_key_gain" => self.component.set_off_key_gain(parameter),
+            "global_threshold" => self.component.set_global_threshold(parameter),
+            "global_threshold_flip" => self.component.set_global_threshold_flip(parameter),
+            "global_threshold_attack" => self.component.set_global_threshold_attack(parameter),
+            "global_threshold_release" => self.component.set_global_threshold_release(parameter),
+            "resonance" => self.component.set_resonance(parameter),
+            "threshold" => self.component.set_threshold(parameter),
+            "threshold_flip" => self.component.set_threshold_flip(parameter),
+            "threshold_attack" => self.component.set_threshold_attack(parameter),
+            "threshold_release" => self.component.set_threshold_release(parameter),
+            "pitch_shift" => self.component.set_pitch_shift(parameter),
+            "pitch_shift_node" => self.component.set_pitch_shift_node(parameter),
             _ => (),
         }
     }
@@ -482,7 +506,7 @@ impl Plugin for CoPiReMapPlugin {
 
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let window_attributes = WindowAttributes::new(
-            LogicalSize::new(800.0, 500.0),
+            LogicalSize::new(800.0, 380.0),
             self.user_scale.clone(),
         );
         let editor = SlintEditor::new(

@@ -10,7 +10,7 @@ export component ParameterSlider inherits Rectangle {
     callback set-string(string);
     in property <bool> blue: false;
     in property <bool> vertical: false;
-    in property <bool> switch;
+    in property <bool> switch: false;
     in-out property <string> text;
     
     border-color: root.background.darker(25%);
@@ -21,16 +21,14 @@ export component ParameterSlider inherits Rectangle {
         edit-text-field.select-all();
     }
     
-    
     VerticalLayout {
-        spacing: root.height * 50%;
+        spacing: root.height * 45%;
         texr := Rectangle {
             Text {
-                text: " " + text + " ";
+                text: text;
                 color: white;
-                font-size: root.height * 120%;
+                font-size: vertical ? root.height * 75%: root.height * 120%;
             }
-            
         }
     
         Rectangle {
@@ -65,7 +63,7 @@ export component ParameterSlider inherits Rectangle {
                     root.changed(root.parameter.default-value);
                 }
                 clicked => {
-                    root.changed(root.parameter.value == 1.0 ? 0.0 : 1.0);
+                    root.switch ? root.changed(root.parameter.value == 1.0 ? 0.0 : 1.0) : root.changed(root.parameter.value);
                 }
                 pointer-event(event) => {
                     if (event.button == PointerEventButton.left) {

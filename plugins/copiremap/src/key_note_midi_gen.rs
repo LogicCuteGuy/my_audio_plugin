@@ -107,7 +107,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            note_d: BoolParam::new("Note D", true)
+            note_d: BoolParam::new("Note D", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -125,7 +125,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            note_e: BoolParam::new("Note E", true)
+            note_e: BoolParam::new("Note E", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -143,7 +143,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            note_f_sharp: BoolParam::new("Note F#", true)
+            note_f_sharp: BoolParam::new("Note F#", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -152,7 +152,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            note_g: BoolParam::new("Note G", true)
+            note_g: BoolParam::new("Note G", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -170,7 +170,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            note_a: BoolParam::new("Note A", true)
+            note_a: BoolParam::new("Note A", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();
@@ -188,7 +188,7 @@ impl KeyNoteParams {
                     })
                 }
             ),
-            note_b: BoolParam::new("Note B", true)
+            note_b: BoolParam::new("Note B", false)
                 .with_callback(
                 {
                     let update_key_note_12 = update_key_note_12.clone();

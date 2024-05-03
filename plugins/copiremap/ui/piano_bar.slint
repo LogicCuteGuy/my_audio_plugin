@@ -83,7 +83,7 @@ export component PianoBar inherits Rectangle {
                     }
                     moved => {
                         if (self.enabled && self.pressed) {
-                            root.changed(low-note, clamp(self.pressed-value + (vertical ? touch.mouse-y - touch.pressed-y : touch.mouse-x - touch.pressed-x) / (root.width - self.width), 0.0, 1.0));
+                            root.changed(low-note, clamp(self.pressed-value + (vertical ? touch.mouse-y - touch.pressed-y : touch.mouse-x - touch.pressed-x) / (root.width - parent.width), 0.0, 1.0));
                         }
                     }
                 }
@@ -122,7 +122,7 @@ export component PianoBar inherits Rectangle {
                     }
                     moved => {
                         if (self.enabled && self.pressed) {
-                            root.changed(high-note, clamp(self.pressed-value + (vertical ? touch2.mouse-y - touch2.pressed-y : touch2.mouse-x - touch2.pressed-x) / (root.width - self.width), 0.0, 1.0));
+                            root.changed(high-note, clamp(self.pressed-value + (vertical ? touch2.mouse-y - touch2.pressed-y : touch2.mouse-x - touch2.pressed-x) / (root.width - parent.width), 0.0, 1.0));
                         }
                     }
                 }
