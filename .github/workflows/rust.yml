@@ -61,7 +61,10 @@ jobs:
           # it needs to be cross compiled
           targets: ${{ matrix.cross-target }}
       - name: Install target
-        run: rustup target add x86_64-apple-darwin
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          rustup target add x86_64-apple-darwin
+          sudo open /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg
       - name: Package all targets from bundler.toml
         # Instead of hardcoding which targets to build and package, we'll
         # package everything that's got en entry in the `bundler.toml` file
