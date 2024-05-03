@@ -3,9 +3,7 @@ name: Automated Builds
 on:
   push:
     branches:
-      - '**'
-    tags:
-      - '*'
+      - main
   pull_request:
     branches:
       - main
