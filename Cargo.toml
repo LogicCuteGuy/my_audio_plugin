@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "examples/demo",
     "plugins/copiremap",
+    "plugins/hydro-stars",
     "nih_plug_slint",
     "plugin-canvas",
     "plugin-canvas-slint",

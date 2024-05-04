@@ -552,7 +552,6 @@ impl Plugin for CoPiReMapPlugin {
                     .is_ok()
                 {
                     self.user_scale.store(self.params.global.scale_gui.value() as f64, Ordering::Release);
-
                 }
                 if self
                     .update_lowpass
