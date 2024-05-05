@@ -71,11 +71,11 @@ impl AudioProcessParams {
             threshold_attack: FloatParam::new("Threshold Attack", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms"),
+            }).with_unit("ms").with_step_size(0.01),
             threshold_release: FloatParam::new("Threshold Release", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms"),
+            }).with_unit("ms").with_step_size(0.01),
             resonance: FloatParam::new("Resonance", 50.0, FloatRange::Linear{ min: 20.0, max: 300.0 })
                 .with_callback(
                     {
