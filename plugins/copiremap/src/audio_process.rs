@@ -84,7 +84,7 @@ impl AudioProcessParams {
                             update_bpf_center_hz.store(true, Ordering::Release);
                         })
                     }
-                ),
+                ).with_step_size(0.01),
             pitch_shift: BoolParam::new(
                 "Pitch Shift",
                 true,

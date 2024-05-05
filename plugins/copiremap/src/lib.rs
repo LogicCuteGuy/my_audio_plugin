@@ -98,7 +98,7 @@ impl GlobalParams {
             scale_gui: FloatParam::new("Scale Gui", 1.0, FloatRange::Linear {
                 min: 0.50,
                 max: 1.5,
-            }).with_unit("x").with_callback(
+            }).with_unit("x").with_step_size(0.01).with_callback(
                 {
                     let update_gui_scale = update_gui_scale.clone();
                     Arc::new(move |_| {
@@ -141,11 +141,11 @@ impl GlobalParams {
             global_threshold_attack: FloatParam::new("Global Threshold Attack", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms"),
+            }).with_unit("ms").with_step_size(0.01),
             global_threshold_release: FloatParam::new("Global Threshold Release", 0.1, FloatRange::Linear {
                 min: 0.1,
                 max: 5.0,
-            }).with_unit("ms"),
+            }).with_unit("ms").with_step_size(0.01),
             low_note_off: IntParam::new(
                 "Low Note Off",
                 36,
