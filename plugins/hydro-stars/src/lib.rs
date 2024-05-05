@@ -9,7 +9,7 @@ use nih_plug::util::db_to_gain;
 use nih_plug::{nih_export_clap, nih_export_vst3};
 use nih_plug::prelude::*;
 use realfft::num_complex::Complex32;
-use realfft::{ComplexToReal, RealToComplex};
+use realfft::{ComplexToReal, RealFftPlanner, RealToComplex};
 use nih_plug_slint::plugin_component_handle::{PluginComponentHandle, PluginComponentHandleParameterEvents};
 use nih_plug_slint::{WindowAttributes, editor::SlintEditor};
 use plugin_canvas::drag_drop::DropOperation;
@@ -70,6 +70,9 @@ pub struct GlobalParams {
 
     #[id = "release"]
     pub compressor_release_ms: FloatParam,
+
+    #[id = "morph"]
+    pub morph: BoolParam,
 }
 
 impl GlobalParams {
@@ -148,6 +151,7 @@ impl GlobalParams {
             )
                 .with_unit(" ms")
                 .with_step_size(0.1),
+            morph: BoolParam::new("Morph", false),
         }
     }
 }
@@ -305,6 +309,8 @@ pub struct HydroStars {
     complex_fft_buffer: Vec<Complex32>,
 }
 
+
+
 struct Plan {
     /// The algorithm for the FFT operation.
     r2c_plan: Arc<dyn RealToComplex<f32>>,
@@ -321,7 +327,18 @@ impl Default for HydroStars {
                 global: Arc::new(GlobalParams::new(update_gui_scale.clone())),
             }),
             update_gui_scale,
-            user_scale: Arc::new(AtomicF64::new(1.0))
+            user_scale: Arc::new(AtomicF64::new(1.0)),
+            buffer_config: BufferConfig {
+                sample_rate: 1.0,
+                min_buffer_size: None,
+                max_buffer_size: 0,
+                process_mode: ProcessMode::Realtime,
+            },
+            stft: util::StftHelper::new(2, MAX_WINDOW_SIZE, 0),
+            window_function: Vec::with_capacity(MAX_WINDOW_SIZE),
+            dry_wet_mixer: DryWetMixer::new(0, 0, 0),
+            plan_for_order: None,
+            complex_fft_buffer: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
         }
     }
 }
@@ -338,9 +355,12 @@ impl Plugin for HydroStars {
             main_input_channels: NonZeroU32::new(2),
             main_output_channels: NonZeroU32::new(2),
 
+            aux_input_ports: &[new_nonzero_u32(2)],
+
             ..AudioIOLayout::const_default()
-        }
+        },
     ];
+
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
     const HARD_REALTIME_ONLY: bool = false;
@@ -371,13 +391,55 @@ impl Plugin for HydroStars {
         Some(Box::new(editor))
     }
 
+    fn reset(&mut self) {
+        self.dry_wet_mixer.reset();
+    }
+
     fn initialize(
         &mut self,
-        _audio_io_layout: &AudioIOLayout,
-        _buffer_config: &BufferConfig,
-        _context: &mut impl InitContext<Self>
+        audio_io_layout: &AudioIOLayout,
+        buffer_config: &BufferConfig,
+        context: &mut impl InitContext<Self>
     ) -> bool
     {
+        // Needed to update the compressors later
+        self.buffer_config = *buffer_config;
+
+        // This plugin can accept a variable number of audio channels, so we need to resize
+        // channel-dependent data structures accordingly
+        let num_output_channels = audio_io_layout
+            .main_output_channels
+            .expect("Plugin does not have a main output")
+            .get() as usize;
+        if self.stft.num_channels() != num_output_channels {
+            self.stft = util::StftHelper::new(self.stft.num_channels(), MAX_WINDOW_SIZE, 0);
+        }
+        self.dry_wet_mixer.resize(
+            num_output_channels,
+            buffer_config.max_buffer_size as usize,
+            MAX_WINDOW_SIZE,
+        );
+
+        // Planning with RustFFT is very fast, but it will still allocate we we'll plan all of the
+        // FFTs we might need in advance
+        if self.plan_for_order.is_none() {
+            let mut planner = RealFftPlanner::new();
+            let plan_for_order: Vec<Plan> = (MIN_WINDOW_ORDER..=MAX_WINDOW_ORDER)
+                .map(|order| Plan {
+                    r2c_plan: planner.plan_fft_forward(1 << order),
+                    c2r_plan: planner.plan_fft_inverse(1 << order),
+                })
+                .collect();
+            self.plan_for_order = Some(
+                plan_for_order
+                    .try_into()
+                    .unwrap_or_else(|_| panic!("Mismatched plan orders")),
+            );
+        }
+
+        let window_size = self.window_size();
+        self.resize_for_window(window_size);
+        context.set_latency_samples(self.stft.latency_samples());
         true
     }
 
@@ -385,7 +447,7 @@ impl Plugin for HydroStars {
         &mut self,
         buffer: &mut Buffer<'_>,
         _aux: &mut AuxiliaryBuffers<'_>,
-        _context: &mut impl ProcessContext<Self>
+        context: &mut impl ProcessContext<Self>
     ) -> ProcessStatus
     {
         if self
@@ -395,12 +457,68 @@ impl Plugin for HydroStars {
         {
             self.user_scale.store(self.params.global.scale_gui.value() as f64, Ordering::Release);
         }
-        for channel in buffer.as_slice() {
-            for sample in channel.iter_mut() {
-            }
+        // If the window size has changed since the last process call, reset the buffers and chance
+        // our latency. All of these buffers already have enough capacity so this won't allocate.
+        let window_size = self.window_size();
+        let overlap_times = self.overlap_times();
+        if self.window_function.len() != window_size {
+            self.resize_for_window(window_size);
+            context.set_latency_samples(self.stft.latency_samples());
         }
 
+        // These plans have already been made during initialization we can switch between versions
+        // without reallocating
+        let fft_plan = &mut self.plan_for_order.as_mut().unwrap()
+            [self.params.global.window_size_order.value() as usize - MIN_WINDOW_ORDER];
+        let num_bins = self.complex_fft_buffer.len();
+        // The Hann window function spreads the DC signal out slightly, so we'll clear all 0-20 Hz
+        // bins for this. With small window sizes you probably don't want this as it would result in
+        // a significant low-pass filter. When it's disabled, the DC bin will also be compressed.
+        let first_non_dc_bin_idx =
+            (20.0 / ((self.buffer_config.sample_rate / 2.0) / num_bins as f32)).floor() as usize
+                + 1;
+
+        // The overlap gain compensation is based on a squared Hann window, which will sum perfectly
+        // at four times overlap or higher. We'll apply a regular Hann window before the analysis
+        // and after the synthesis.
+        let gain_compensation: f32 =
+            ((overlap_times as f32 / 4.0) * 1.5).recip() / window_size as f32;
+
+        // We'll apply the square root of the total gain compensation at the DFT and the IDFT
+        // stages. That way the compressor threshold values make much more sense. This version of
+        // Spectral Compressor does not have in input gain option and instead has the curve
+        // threshold option. When sidechaining is enabled this is used to gain up the sidechain
+        // signal instead.
+        let input_gain = gain_compensation.sqrt();
+        let output_gain = self.params.global.output_gain.value() * gain_compensation.sqrt();
+        // TODO: Auto makeup gain
+
+        // This is mixed in later with latency compensation applied
+        self.dry_wet_mixer.write_dry(buffer);
         ProcessStatus::Normal
+    }
+}
+
+impl HydroStars {
+    fn window_size(&self) -> usize {
+        1 << self.params.global.window_size_order.value() as usize
+    }
+
+    fn overlap_times(&self) -> usize {
+        1 << self.params.global.overlap_times_order.value() as usize
+    }
+
+    /// `window_size` should not exceed `MAX_WINDOW_SIZE` or this will allocate.
+    fn resize_for_window(&mut self, window_size: usize) {
+        // The FFT algorithms for this window size have already been planned in
+        // `self.plan_for_order`, and all of these data structures already have enough capacity, so
+        // we just need to change some sizes.
+        self.stft.set_block_size(window_size);
+        self.window_function.resize(window_size, 0.0);
+        util::window::hann_in_place(&mut self.window_function);
+        self.complex_fft_buffer
+            .resize(window_size / 2 + 1, Complex32::default());
+        
     }
 }
 
