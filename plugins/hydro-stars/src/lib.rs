@@ -1,4 +1,5 @@
 mod dry_wet_mixer;
+mod stars_bank;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
