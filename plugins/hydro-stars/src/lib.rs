@@ -1,5 +1,4 @@
 mod dry_wet_mixer;
-mod stars_bank;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
@@ -499,8 +498,25 @@ impl Plugin for HydroStars {
 
         match self.params.global.morph.value() {
             true => {}
-            false => {}
+            false => self.stft.process_overlap_add(
+                    buffer,
+                    overlap_times,
+                    |channel_idx, real_fft_buffer| {
+                        process_stft_main(channel_idx, real_fft_buffer, &mut self.complex_fft_buffer, fft_plan, &self.window_function, &self.params, input_gain, output_gain, overlap_times, first_non_dc_bin_idx)
+                    },
+                )
         }
+        self.dry_wet_mixer.mix_in_dry(
+            buffer,
+            self.params
+                .global
+                .dry_wet_ratio
+                .smoothed
+                .next_step(buffer.samples() as u32),
+            // The dry and wet signals are in phase, so we can do a linear mix
+            dry_wet_mixer::MixingStyle::Linear,
+            self.stft.latency_samples() as usize,
+        );
         ProcessStatus::Normal
     }
 }
@@ -535,8 +551,7 @@ fn process_stft_main(
     complex_fft_buffer: &mut [Complex32],
     fft_plan: &Plan,
     window_function: &[f32],
-    params: &SpectralCompressorParams,
-    compressor_bank: &mut compressor_bank::CompressorBank,
+    params: &PluginParams,
     input_gain: f32,
     output_gain: f32,
     overlap_times: usize,
@@ -557,13 +572,22 @@ fn process_stft_main(
         .unwrap();
 
     // This is where the magic happens
-    compressor_bank.process(
-        complex_fft_buffer,
-        channel_idx,
-        params,
-        overlap_times,
-        first_non_dc_bin_idx,
-    );
+
+    for (bin_idx, bin) in complex_fft_buffer
+        .iter_mut()
+        .enumerate()
+    {
+        // We'll apply the transfer curve to the envelope signal, and then scale the complex
+        // `bin` by the gain difference
+        let envelope_db = util::gain_to_db_fast_epsilon(1.0);
+
+
+        // If the comprssed output is -10 dBFS and the envelope follower was at -6 dBFS, then we
+        // want to apply -4 dB of gain to the bin
+        let gain_difference_db = envelope_db * 2.0;
+
+        *bin *= util::db_to_gain_fast(gain_difference_db);
+    }
 
     // Inverse FFT back into the scratch buffer. This will be added to a ring buffer
     // which gets written back to the host at a one block delay.
@@ -583,27 +607,26 @@ fn process_stft_main(
 /// The analysis process function inside of the STFT callback used to compute the frequency
 /// spectrum magnitudes from the sidechain input if the sidechaining option is enabled. All
 /// sidechain channels will be processed before processing the main input
-fn process_stft_sidechain(
-    channel_idx: usize,
-    real_fft_buffer: &mut [f32],
-    complex_fft_buffer: &mut [Complex32],
-    fft_plan: &Plan,
-    window_function: &[f32],
-    compressor_bank: &mut compressor_bank::CompressorBank,
-    input_gain: f32,
-) {
-    // The sidechain input should be gained, scaled, and windowed the exact same was as the
-    // main input as it's used for analysis
-    for (sample, window_sample) in real_fft_buffer.iter_mut().zip(window_function) {
-        *sample *= window_sample * input_gain;
-    }
-
-    fft_plan
-        .r2c_plan
-        .process_with_scratch(real_fft_buffer, complex_fft_buffer, &mut [])
-        .unwrap();
-    compressor_bank.process_sidechain(complex_fft_buffer, channel_idx);
-}
+// fn process_stft_sidechain(
+//     channel_idx: usize,
+//     real_fft_buffer: &mut [f32],
+//     complex_fft_buffer: &mut [Complex32],
+//     fft_plan: &Plan,
+//     window_function: &[f32],
+//     input_gain: f32,
+// ) {
+//     // The sidechain input should be gained, scaled, and windowed the exact same was as the
+//     // main input as it's used for analysis
+//     for (sample, window_sample) in real_fft_buffer.iter_mut().zip(window_function) {
+//         *sample *= window_sample * input_gain;
+//     }
+// 
+//     fft_plan
+//         .r2c_plan
+//         .process_with_scratch(real_fft_buffer, complex_fft_buffer, &mut [])
+//         .unwrap();
+//     compressor_bank.process_sidechain(complex_fft_buffer, channel_idx);
+// }
 
 impl ClapPlugin for HydroStars {
     const CLAP_ID: &'static str = "com.logiccuteguy.hydrostars";
