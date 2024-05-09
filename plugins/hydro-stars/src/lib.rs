@@ -71,6 +71,9 @@ pub struct GlobalParams {
     #[id = "release"]
     pub compressor_release_ms: FloatParam,
 
+    #[id = "shift_position"]
+    pub shift_position: FloatParam,
+
     #[id = "morph"]
     pub morph: BoolParam,
 }
@@ -151,6 +154,15 @@ impl GlobalParams {
             )
                 .with_unit(" ms")
                 .with_step_size(0.01),
+            shift_position: FloatParam::new(
+                "Shift Position",
+                300.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 1.0,
+                },
+            )
+                .with_step_size(0.0001),
             morph: BoolParam::new("Morph", false),
         }
     }
@@ -222,7 +234,7 @@ impl PluginComponent {
                 // self.component.set_scale_gui(parameter)
             },
             "gain" => self.component.set_gain(parameter),
-            _ => unimplemented!(),
+            _ => {},
         }
     }
 }
@@ -307,6 +319,8 @@ pub struct HydroStars {
     dry_wet_mixer: DryWetMixer,
     plan_for_order: Option<[Plan; MAX_WINDOW_ORDER - MIN_WINDOW_ORDER + 1]>,
     complex_fft_buffer: Vec<Complex32>,
+    
+    volumes: Vec<f32>
 }
 
 
@@ -339,6 +353,7 @@ impl Default for HydroStars {
             dry_wet_mixer: DryWetMixer::new(0, 0, 0),
             plan_for_order: None,
             complex_fft_buffer: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
+            volumes: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
         }
     }
 }
@@ -420,6 +435,8 @@ impl Plugin for HydroStars {
             MAX_WINDOW_SIZE,
         );
 
+        self.volumes.resize(MAX_WINDOW_SIZE, 0.0);
+
         // Planning with RustFFT is very fast, but it will still allocate we we'll plan all of the
         // FFTs we might need in advance
         if self.plan_for_order.is_none() {
@@ -437,6 +454,8 @@ impl Plugin for HydroStars {
             );
         }
 
+        
+        
         let window_size = self.window_size();
         self.resize_for_window(window_size);
         context.set_latency_samples(self.stft.latency_samples());
@@ -579,7 +598,7 @@ fn process_stft_main(
     {
         // We'll apply the transfer curve to the envelope signal, and then scale the complex
         // `bin` by the gain difference
-        let envelope_db = util::gain_to_db_fast_epsilon(1.0);
+        let envelope_db = util::gain_to_db_fast_epsilon(0.0);
 
 
         // If the comprssed output is -10 dBFS and the envelope follower was at -6 dBFS, then we
