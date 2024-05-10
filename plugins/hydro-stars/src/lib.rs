@@ -1,4 +1,5 @@
 mod dry_wet_mixer;
+mod volume_table;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
@@ -17,6 +18,7 @@ use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
 use crate::dry_wet_mixer::DryWetMixer;
+use crate::volume_table::VolumeTable;
 
 slint::include_modules!();
 
@@ -42,6 +44,9 @@ const MAX_OVERLAP_TIMES: usize = 1 << MAX_OVERLAP_ORDER; // 32
 
 #[derive(Params)]
 pub struct PluginParams {
+
+    #[persist = "volume_table"]
+    pub volume_table: Arc<VolumeTable>,
 
     #[nested(group = "global")]
     pub global: Arc<GlobalParams>,
@@ -73,6 +78,9 @@ pub struct GlobalParams {
 
     #[id = "shift_position"]
     pub shift_position: FloatParam,
+
+    #[id = "spectral_gate"]
+    pub spectral_gate: FloatParam,
 
     #[id = "morph"]
     pub morph: BoolParam,
@@ -163,6 +171,10 @@ impl GlobalParams {
                 },
             )
                 .with_step_size(0.0001),
+            spectral_gate: FloatParam::new("Spectral Gate", 0.0, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_unit("%")
+                .with_value_to_string(formatters::v2s_f32_percentage(1))
+                .with_string_to_value(formatters::s2v_f32_percentage()),
             morph: BoolParam::new("Morph", false),
         }
     }
@@ -339,6 +351,7 @@ impl Default for HydroStars {
         Self {
             params: Arc::new(PluginParams {
                 global: Arc::new(GlobalParams::new(update_gui_scale.clone())),
+                volume_table: Arc::new(VolumeTable::default())
             }),
             update_gui_scale,
             user_scale: Arc::new(AtomicF64::new(1.0)),

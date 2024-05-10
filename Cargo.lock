@@ -465,6 +465,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62af46d040ba9df09edc6528dae9d8e49f5f3e82f55b7d2ec31a733c38dbc49d"
 
 [[package]]
+name = "atomic_float"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c4b08ed8a30ff7320117c190eb4d73d47f0ac0c930ab853b8224cef7cd9a5e7"
+
+[[package]]
 name = "atomic_refcell"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -986,7 +992,7 @@ checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 name = "copiremap"
 version = "0.0.1"
 dependencies = [
- "atomic_float",
+ "atomic_float 1.0.0",
  "crossbeam",
  "nih_plug",
  "nih_plug_slint",
@@ -1918,11 +1924,13 @@ checksum = "62adaabb884c94955b19907d60019f4e145d091c75345379e70d1ee696f7854f"
 name = "hydro-stars"
 version = "0.0.0"
 dependencies = [
- "atomic_float",
+ "atomic_float 1.0.0",
+ "crossbeam",
  "nih_plug",
  "nih_plug_slint",
  "plugin-canvas",
  "realfft",
+ "serde",
  "slint",
  "slint-build",
 ]
@@ -2688,7 +2696,7 @@ source = "git+https://github.com/robbert-vdh/nih-plug/#245add6530f1c7d83fea5e236
 dependencies = [
  "anyhow",
  "anymap",
- "atomic_float",
+ "atomic_float 0.1.0",
  "atomic_refcell",
  "backtrace",
  "baseview",
@@ -3156,7 +3164,7 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "plugin-canvas"
 version = "0.0.0"
 dependencies = [
- "atomic_float",
+ "atomic_float 1.0.0",
  "core-graphics 0.23.1",
  "cursor-icon",
  "icrate 0.1.0",

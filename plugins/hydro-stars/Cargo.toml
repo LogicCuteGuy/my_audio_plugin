@@ -13,6 +13,8 @@ plugin-canvas.workspace = true
 slint.workspace = true
 atomic_float.workspace = true
 realfft.workspace = true
+serde.workspace = true
+crossbeam.workspace = true
 
 [build-dependencies]
 slint-build = "1.5"
