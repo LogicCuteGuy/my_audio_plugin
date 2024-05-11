@@ -3,7 +3,9 @@ mod volume_table;
 
 use std::collections::HashMap;
 use std::{sync::Arc, num::NonZeroU32};
+use std::ops::DerefMut;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use atomic_float::AtomicF64;
 
 use nih_plug::util::db_to_gain;
@@ -332,7 +334,8 @@ pub struct HydroStars {
     plan_for_order: Option<[Plan; MAX_WINDOW_ORDER - MIN_WINDOW_ORDER + 1]>,
     complex_fft_buffer: Vec<Complex32>,
     
-    volumes: Vec<f32>
+    volumes: Vec<f32>,
+    volumes_doing: Arc<Mutex<Vec<f32>>>
 }
 
 
@@ -367,6 +370,7 @@ impl Default for HydroStars {
             plan_for_order: None,
             complex_fft_buffer: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
             volumes: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
+            volumes_doing: Arc::new(Mutex::new(Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1))),
         }
     }
 }
@@ -448,7 +452,7 @@ impl Plugin for HydroStars {
             MAX_WINDOW_SIZE,
         );
 
-        self.volumes.resize(MAX_WINDOW_SIZE, 0.0);
+        
 
         // Planning with RustFFT is very fast, but it will still allocate we we'll plan all of the
         // FFTs we might need in advance
@@ -569,6 +573,8 @@ impl HydroStars {
         // we just need to change some sizes.
         self.stft.set_block_size(window_size);
         self.window_function.resize(window_size, 0.0);
+        self.volumes.resize(window_size, 0.0);
+        self.volumes_doing.lock().unwrap().resize(window_size, 0.0);
         util::window::hann_in_place(&mut self.window_function);
         self.complex_fft_buffer
             .resize(window_size / 2 + 1, Complex32::default());

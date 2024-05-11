@@ -30,6 +30,7 @@ thiserror = "1.0.58"
 serde = { version = "1.0.198", features = ["derive"] }
 crossbeam = "0.8.4"
 atomic_float = "1.0.0"
+synth-utils = {git = "https://github.com/JordanAceto/synth-utils-rs.git"}
 
 # Internal slint crate versions need to be pinned
 # since they don't maintain semver compatibility

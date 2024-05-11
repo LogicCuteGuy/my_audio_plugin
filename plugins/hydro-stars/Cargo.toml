@@ -15,6 +15,7 @@ atomic_float.workspace = true
 realfft.workspace = true
 serde.workspace = true
 crossbeam.workspace = true
+synth-utils.workspace = true
 
 [build-dependencies]
 slint-build = "1.5"
