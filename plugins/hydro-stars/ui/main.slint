@@ -8,6 +8,8 @@ export component PluginWindow {
     in-out property <bool> dragging;
     in-out property <length> drag-x;
     in-out property <length> drag-y;
+
+    in-out property <string> ph_test;
     
     out property <length> drop-area-x: drop-area.x;
     out property <length> drop-area-y: drop-area.y;
@@ -19,6 +21,9 @@ export component PluginWindow {
     callback end-change(PluginParameter);
     callback set-string(PluginParameter, string);
 
+    width: 800px;
+    height: 600px;
+
     Rectangle {
         background: gold;
 
@@ -28,7 +33,11 @@ export component PluginWindow {
                 enabled: true;
             }
         }
-
+        Text {
+            text: "ph: " + ph_test;
+            font-size: 10px;
+            z: 1;
+        }
         drop-area := Rectangle {
             background: red;
             width: 100px;

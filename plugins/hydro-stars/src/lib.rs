@@ -19,6 +19,7 @@ use plugin_canvas::drag_drop::DropOperation;
 use plugin_canvas::{LogicalSize, Event, LogicalPosition};
 use plugin_canvas::event::EventResponse;
 use slint::SharedString;
+use synth_utils::lfo::Lfo;
 use crate::dry_wet_mixer::DryWetMixer;
 use crate::volume_table::VolumeTable;
 
@@ -185,10 +186,11 @@ pub struct PluginComponent {
     component: PluginWindow,
     param_map: HashMap<SharedString, ParamPtr>,
     gui_context: Arc<dyn GuiContext>,
+    test_val: Arc<Mutex<String>>,
 }
 
 impl PluginComponent {
-    fn new(params: Arc<PluginParams>, gui_context: Arc<dyn GuiContext>) -> Self {
+    fn new(params: Arc<PluginParams>, gui_context: Arc<dyn GuiContext>, test_val: Arc<Mutex<String>>) -> Self {
         let component = PluginWindow::new().unwrap();
 
         let param_map: HashMap<SharedString, _> = params.param_map().iter()
@@ -200,7 +202,8 @@ impl PluginComponent {
         Self {
             component,
             param_map,
-            gui_context
+            gui_context,
+            test_val
         }
     }
 
@@ -282,7 +285,10 @@ impl PluginComponentHandle for PluginComponent {
                 self.component.set_dragging(false);
                 self.drag_event_response(position)
             },
-
+            Event::Draw {} => {
+                self.component.set_ph_test(SharedString::from(self.test_val.lock().unwrap().to_string()));
+                EventResponse::Handled
+            }
             _ => EventResponse::Ignored,
         }
     }
@@ -335,7 +341,10 @@ pub struct HydroStars {
     complex_fft_buffer: Vec<Complex32>,
     
     volumes: Vec<f32>,
-    volumes_doing: Arc<Mutex<Vec<f32>>>
+    volumes_doing: Arc<Mutex<Vec<f32>>>,
+    lfo: Vec<Lfo>,
+    
+    test_val: Arc<Mutex<String>>
 }
 
 
@@ -371,6 +380,8 @@ impl Default for HydroStars {
             complex_fft_buffer: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
             volumes: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
             volumes_doing: Arc::new(Mutex::new(Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1))),
+            test_val: Arc::new(Mutex::new(String::new())),
+            lfo: Vec::with_capacity(MAX_WINDOW_SIZE / 2 + 1),
         }
     }
 }
@@ -414,8 +425,9 @@ impl Plugin for HydroStars {
             window_attributes,
             {
                 let params = self.params.clone();
+                let test_val = self.test_val.clone();
                 move |_window, gui_context| {
-                    PluginComponent::new(params.clone(), gui_context.clone())
+                    PluginComponent::new(params.clone(), gui_context.clone(), test_val.clone())
                 }
             },
         );
@@ -486,13 +498,6 @@ impl Plugin for HydroStars {
         context: &mut impl ProcessContext<Self>
     ) -> ProcessStatus
     {
-        if self
-            .update_gui_scale
-            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
-            .is_ok()
-        {
-            self.user_scale.store(self.params.global.scale_gui.value() as f64, Ordering::Release);
-        }
         // If the window size has changed since the last process call, reset the buffers and chance
         // our latency. All of these buffers already have enough capacity so this won't allocate.
         let window_size = self.window_size();
@@ -500,6 +505,14 @@ impl Plugin for HydroStars {
         if self.window_function.len() != window_size {
             self.resize_for_window(window_size);
             context.set_latency_samples(self.stft.latency_samples());
+        }
+        
+        if self
+            .update_gui_scale
+            .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            self.user_scale.store(self.params.global.scale_gui.value() as f64, Ordering::Release);
         }
 
         // These plans have already been made during initialization we can switch between versions
@@ -532,6 +545,10 @@ impl Plugin for HydroStars {
         // This is mixed in later with latency compensation applied
         self.dry_wet_mixer.write_dry(buffer);
 
+        if let Ok(mut test_val) = self.test_val.lock() {
+            *test_val = String::from(format!("{:?}", context.transport().pos_seconds()));
+        }
+        // find beats 
         match self.params.global.morph.value() {
             true => {}
             false => self.stft.process_overlap_add(
@@ -575,6 +592,7 @@ impl HydroStars {
         self.window_function.resize(window_size, 0.0);
         self.volumes.resize(window_size, 0.0);
         self.volumes_doing.lock().unwrap().resize(window_size, 0.0);
+        self.lfo.resize(window_size, Lfo::new(self.buffer_config.sample_rate));
         util::window::hann_in_place(&mut self.window_function);
         self.complex_fft_buffer
             .resize(window_size / 2 + 1, Complex32::default());
